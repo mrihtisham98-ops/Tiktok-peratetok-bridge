@@ -2048,8 +2048,28 @@ function _uploadZipToR2(uploadUrl, blob, onProgress) {
             }
         };
 
-        xhr.onerror = () => {
-            reject({ status: 0, code: 'NETWORK_OR_CORS', message: 'Network error or CORS blocked' });
+        xhr.onerror = (event) => {
+            let uploadHost = 'unknown';
+            try { uploadHost = new URL(uploadUrl).host; } catch (e) {}
+            const pageOrigin = (typeof window !== 'undefined' && window.location)
+                ? window.location.origin
+                : 'unknown';
+            try {
+                console.error('[R2 UPLOAD NETWORK ERROR]', {
+                    eventType: event && event.type ? event.type : 'error',
+                    uploadHost,
+                    pageOrigin,
+                    signedHeaders: signed,
+                    withCredentials: xhr.withCredentials,
+                    readyState: xhr.readyState,
+                    status: xhr.status
+                });
+            } catch (e) {}
+            reject({
+                status: 0,
+                code: 'NETWORK_OR_CORS',
+                message: `Network/CORS failure; host=${uploadHost}; origin=${pageOrigin}`
+            });
         };
         xhr.ontimeout = () => {
             reject({ status: 0, code: 'TIMEOUT', message: 'Upload timed out (10 min)' });
@@ -2093,9 +2113,10 @@ function _classifyR2Error(err) {
    FIXED: R2-based Cloud APK Build
    Flow:
      1. buildId = crypto.randomUUID()
-     2. POST /api/r2-upload-url { buildId } → { uploadUrl, fileKey }
-     3. XHR PUT uploadUrl (signed headers only) with ZIP blob + progress
-     4. POST /api/r2-upload-complete { buildId, fileKey, appName, packageName, adMob }
+     2. Build and validate ZIP locally
+     3. POST /api/r2-upload-url { buildId } → { uploadUrl, fileKey }
+     4. XHR PUT uploadUrl (signed headers only) with ZIP blob + progress
+     5. POST /api/r2-upload-complete { buildId, fileKey, appName, packageName, adMob }
    ========================================================= */
 async function requestCloudAPKBuild() {
     window.hideDropdownMenu();
@@ -2150,7 +2171,23 @@ async function requestCloudAPKBuild() {
         }
         logTerminalMessage(`🆔 Build ID: ${buildId}`);
 
-        // === STEP 2: Request presigned upload URL ===
+        // === STEP 2: Build ZIP FIRST and validate it ===
+        // Generate the archive before requesting a presigned URL so ZIP
+        // packaging time cannot consume the URL's expiration window.
+        let zipBlob;
+        try {
+            logTerminalMessage("📦 Packaging project into ZIP...");
+            zipBlob = await buildProjectZipBlob();
+            if (!zipBlob || typeof zipBlob.size !== 'number' || zipBlob.size <= 0) {
+                throw new Error(`Generated ZIP is empty or invalid (size=${zipBlob && zipBlob.size !== undefined ? zipBlob.size : 'unknown'} bytes). Check project files and ZIP generation.`);
+            }
+            logTerminalMessage(`✅ ZIP created (${(zipBlob.size / 1024 / 1024).toFixed(2)} MB; ${(zipBlob.size / 1024).toFixed(2)} KB; ${zipBlob.size} bytes).`);
+        } catch (zipErr) {
+            logTerminalMessage(`❌ ZIP generation failed: ${zipErr.message}`, true);
+            return;
+        }
+
+        // === STEP 3: Request a fresh presigned upload URL AFTER ZIP is ready ===
         let uploadUrl, fileKey;
         try {
             const cleanBaseUrl = BACKEND_URL.replace(/\/+$/, '');
@@ -2170,20 +2207,9 @@ async function requestCloudAPKBuild() {
             }
             uploadUrl = urlData.uploadUrl;
             fileKey = urlData.fileKey;
-            logTerminalMessage(`✅ Presigned upload URL received. File key: ${fileKey}`);
+            logTerminalMessage(`✅ Fresh presigned upload URL received. File key: ${fileKey}`);
         } catch (err) {
             logTerminalMessage(`❌ Failed to get R2 upload URL: ${err.message}`, true);
-            return;
-        }
-
-        // === STEP 3: Build ZIP and upload directly to R2 (XHR, signed headers only) ===
-        let zipBlob;
-        try {
-            logTerminalMessage("📦 Packaging project into ZIP...");
-            zipBlob = await buildProjectZipBlob();
-            logTerminalMessage(`✅ ZIP created (${(zipBlob.size / 1024 / 1024).toFixed(2)} MB).`);
-        } catch (zipErr) {
-            logTerminalMessage(`❌ ZIP generation failed: ${zipErr.message}`, true);
             return;
         }
 
