@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Web App Studio - Precision IDE</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link rel="stylesheet" href="_bundled/12466kc-all.min.css">
-<script src="_bundled/j3p3mw-socket.io.min.js"></script>
-<script src="_bundled/3dbjmd-jszip.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 .code-font {
 font-family: 'Consolas', 'Fira Code', 'Courier New', monospace;
@@ -1088,10 +1088,10 @@ let baseHtml = allFiles['index.html'] || allFiles['Crikzone/index.html'] || `
 </html>`;
 const coreHeadLibs = `
 <script src="https://cdn.tailwindcss.com"><\/script>
-<link rel="stylesheet" href="_bundled/12466kc-all.min.css">
-<script src="_bundled/1hhyiyc-lucide_latest.bin"><\/script>
-<script src="_bundled/1v4gi1k-react.development.js" crossorigin><\/script>
-<script src="_bundled/1oc7f2q-react-dom.development.js" crossorigin><\/script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://unpkg.com/lucide@latest"><\/script>
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin><\/script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin><\/script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
 `;
 const admobCfg = getEffectiveAdMobConfig();
@@ -2048,28 +2048,8 @@ function _uploadZipToR2(uploadUrl, blob, onProgress) {
             }
         };
 
-        xhr.onerror = (event) => {
-            let uploadHost = 'unknown';
-            try { uploadHost = new URL(uploadUrl).host; } catch (e) {}
-            const pageOrigin = (typeof window !== 'undefined' && window.location)
-                ? window.location.origin
-                : 'unknown';
-            try {
-                console.error('[R2 UPLOAD NETWORK ERROR]', {
-                    eventType: event && event.type ? event.type : 'error',
-                    uploadHost,
-                    pageOrigin,
-                    signedHeaders: signed,
-                    withCredentials: xhr.withCredentials,
-                    readyState: xhr.readyState,
-                    status: xhr.status
-                });
-            } catch (e) {}
-            reject({
-                status: 0,
-                code: 'NETWORK_OR_CORS',
-                message: `Network/CORS failure; host=${uploadHost}; origin=${pageOrigin}`
-            });
+        xhr.onerror = () => {
+            reject({ status: 0, code: 'NETWORK_OR_CORS', message: 'Network error or CORS blocked' });
         };
         xhr.ontimeout = () => {
             reject({ status: 0, code: 'TIMEOUT', message: 'Upload timed out (10 min)' });
@@ -2170,21 +2150,8 @@ async function requestCloudAPKBuild() {
         }
         logTerminalMessage(`🆔 Build ID: ${buildId}`);
 
+        // === STEP 2: Request presigned upload URL ===
         let uploadUrl, fileKey;
-
-        // === STEP 3: Build ZIP and upload directly to R2 (XHR, signed headers only) ===
-        let zipBlob;
-        try {
-            logTerminalMessage("📦 Packaging project into ZIP...");
-            zipBlob = await buildProjectZipBlob();
-            logTerminalMessage(`✅ ZIP created (${(zipBlob.size / 1024 / 1024).toFixed(2)} MB).`);
-        } catch (zipErr) {
-            logTerminalMessage(`❌ ZIP generation failed: ${zipErr.message}`, true);
-            return;
-        }
-
-        // === STEP 2: Request a fresh presigned URL AFTER ZIP is ready ===
-        // This prevents offline bundling / ZIP creation time from consuming URL expiry.
         try {
             const cleanBaseUrl = BACKEND_URL.replace(/\/+$/, '');
             const urlResp = await fetch(`${cleanBaseUrl}/api/r2-upload-url`, {
@@ -2203,9 +2170,20 @@ async function requestCloudAPKBuild() {
             }
             uploadUrl = urlData.uploadUrl;
             fileKey = urlData.fileKey;
-            logTerminalMessage(`✅ Fresh presigned upload URL received. File key: ${fileKey}`);
+            logTerminalMessage(`✅ Presigned upload URL received. File key: ${fileKey}`);
         } catch (err) {
             logTerminalMessage(`❌ Failed to get R2 upload URL: ${err.message}`, true);
+            return;
+        }
+
+        // === STEP 3: Build ZIP and upload directly to R2 (XHR, signed headers only) ===
+        let zipBlob;
+        try {
+            logTerminalMessage("📦 Packaging project into ZIP...");
+            zipBlob = await buildProjectZipBlob();
+            logTerminalMessage(`✅ ZIP created (${(zipBlob.size / 1024 / 1024).toFixed(2)} MB).`);
+        } catch (zipErr) {
+            logTerminalMessage(`❌ ZIP generation failed: ${zipErr.message}`, true);
             return;
         }
 
