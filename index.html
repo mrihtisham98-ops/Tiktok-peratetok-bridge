@@ -1,0 +1,2919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Web App Studio - Precision IDE</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="_bundled/12466kc-all.min.css">
+<script src="_bundled/j3p3mw-socket.io.min.js"></script>
+<script src="_bundled/3dbjmd-jszip.min.js"></script>
+<style>
+.code-font {
+font-family: 'Consolas', 'Fira Code', 'Courier New', monospace;
+tab-size: 4;
+line-height: 1.6;
+font-size: 13px;
+}
+#codeEditor {
+background-color: #141416;
+color: #e4e4e7;
+caret-color: #3b82f6;
+outline: none;
+border: none;
+white-space: pre;
+overflow-x: auto;
+resize: none;
+touch-action: manipulation;
+-webkit-user-select: text !important;
+user-select: text !important;
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #18181b; }
+::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #52525b; }
+.ai-chat-msg { animation: fadeIn 0.2s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.ai-code-block { background: #0f0f11; border: 1px solid #27272a; border-radius: 8px; padding: 8px; margin: 6px 0; overflow-x: auto; position: relative; }
+.ai-typing::after { content: '▋'; animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+#lineHighlightOverlay {
+position: absolute;
+left: 0; right: 0;
+height: 21px;
+background: rgba(59, 130, 246, 0.15);
+border-top: 2px solid #3b82f6;
+border-bottom: 2px solid #3b82f6;
+pointer-events: none;
+z-index: 5;
+display: none;
+}
+.copy-code-btn {
+position: absolute;
+top: 4px;
+right: 4px;
+background: #27272a;
+color: #a1a1aa;
+border: 1px solid #3f3f46;
+border-radius: 6px;
+padding: 3px 8px;
+font-size: 10px;
+cursor: pointer;
+transition: all 0.15s;
+z-index: 10;
+}
+.copy-code-btn:hover {
+background: #3f3f46;
+color: #ffffff;
+border-color: #52525b;
+}
+.copy-code-btn.copied {
+background: #059669;
+color: #ffffff;
+border-color: #10b981;
+}
+
+.tiktok-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.tiktok-dot {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #a855f7;
+  animation: tiktokBounce 1s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+.tiktok-dot:nth-child(2) {
+  animation-delay: 0.15s;
+  background: #ec4899;
+}
+@keyframes tiktokBounce {
+  0%, 100% { transform: translateY(0) scale(1); opacity: 0.6; }
+  50% { transform: translateY(-6px) scale(1.2); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tiktok-dot { animation-duration: 2s; }
+}
+
+/* R2 upload progress bar (inside terminal) */
+#r2UploadProgressWrap {
+  margin-top: 6px;
+  background: #1a1a1e;
+  border: 1px solid #27272a;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+#r2UploadProgressBar {
+  height: 6px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  border-radius: 3px;
+  width: 0%;
+  transition: width 0.2s;
+}
+</style>
+</head>
+<body class="bg-[#121214] text-[#e4e4e7] h-screen w-screen overflow-hidden flex flex-col font-sans select-none">
+
+<input type="file" id="folderPicker" webkitdirectory directory multiple class="hidden" onchange="handleFolderSelect(event)">
+
+<header class="bg-[#18181b] text-zinc-200 px-2 sm:px-4 py-2.5 flex items-center justify-between border-b border-zinc-800 shadow-xl z-20 gap-1">
+<div class="flex items-center gap-1.5 sm:gap-3 min-w-0">
+<button onclick="toggleExplorerDrawer()" class="p-1.5 sm:p-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-300 hover:text-white transition-all cursor-pointer shadow-sm shrink-0" title="Toggle Explorer">
+<i class="fa-solid fa-folder-tree text-sm sm:text-base pointer-events-none"></i>
+</button>
+<div class="flex items-center gap-2 min-w-0">
+<div id="displayAppIconWrapper" class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30 text-white font-bold shrink-0 overflow-hidden cursor-pointer" onclick="openAppConfigModal()" title="App Icon & Name Settings">
+<i id="displayAppIconFallback" class="fa-solid fa-code text-xs sm:text-sm"></i>
+<img id="displayAppIconImg" class="w-full h-full object-cover hidden" alt="App Icon" />
+</div>
+<div class="truncate cursor-pointer" onclick="openAppConfigModal()">
+<h1 id="displayAppName" class="font-bold text-xs sm:text-sm tracking-wide text-white truncate">Web App Studio</h1>
+<p class="text-[9px] sm:text-[10px] text-zinc-400 truncate">Native HTML/CSS/JS</p>
+</div>
+</div>
+<div class="flex items-center gap-1 sm:gap-2 ml-1 sm:ml-4 border-l border-zinc-800 pl-2 sm:pl-4 shrink-0">
+<button onclick="manualSaveFile()" class="px-2 sm:px-3 py-1.5 bg-zinc-800 hover:bg-emerald-600/20 hover:border-emerald-500/50 border border-zinc-700 rounded-lg text-zinc-200 hover:text-emerald-400 flex items-center gap-1.5 transition-all cursor-pointer text-[11px] sm:text-xs font-medium shrink-0" title="Save File to Workspace Folder">
+<i class="fa-solid fa-floppy-disk pointer-events-none"></i> <span class="hidden xs:inline">Save</span>
+</button>
+<button onclick="triggerFolderSelect()" class="px-2 sm:px-3 py-1.5 bg-zinc-800 hover:bg-amber-600/20 hover:border-amber-500/50 border border-zinc-700 rounded-lg text-zinc-200 hover:text-amber-400 flex items-center gap-1.5 transition-all cursor-pointer text-[11px] sm:text-xs font-medium shrink-0" title="Open Local Storage Folder">
+<i class="fa-solid fa-folder-open pointer-events-none"></i> <span class="hidden md:inline">Open Folder</span>
+</button>
+<button onclick="openSearchModal()" class="px-2 sm:px-3 py-1.5 bg-zinc-800 hover:bg-blue-600/20 hover:border-blue-500/50 border border-zinc-700 rounded-lg text-zinc-200 hover:text-blue-400 flex items-center gap-1.5 transition-all cursor-pointer text-[11px] sm:text-xs font-medium shrink-0" title="Search Code (VS Code style)">
+<i class="fa-solid fa-magnifying-glass pointer-events-none"></i> <span class="hidden sm:inline">Search</span>
+</button>
+<button onclick="toggleAIChatDrawer()" class="px-2 sm:px-3 py-1.5 bg-zinc-800 hover:bg-purple-600/20 hover:border-purple-500/50 border border-zinc-700 rounded-lg text-zinc-200 hover:text-purple-400 flex items-center gap-1.5 transition-all cursor-pointer text-[11px] sm:text-xs font-medium shrink-0" title="AI Assistant">
+<i class="fa-solid fa-robot pointer-events-none"></i> <span class="hidden sm:inline">AI</span>
+</button>
+</div>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<span class="hidden lg:flex items-center gap-1.5 text-[11px] text-emerald-400 font-mono bg-emerald-950/40 px-3 py-1 rounded-full border border-emerald-800/40">
+<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Engine Ready
+</span>
+<div class="relative shrink-0">
+<button onclick="toggleMainDrawerMenu(event)" class="p-1.5 sm:p-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-200 transition-all cursor-pointer relative z-30 shadow-sm" title="Menu">
+<i class="fa-solid fa-bars text-sm sm:text-base pointer-events-none"></i>
+</button>
+<div id="mainDropdownMenu" class="hidden absolute right-0 mt-2 w-60 bg-[#1f1f23] border border-zinc-700/80 rounded-xl shadow-2xl z-50 py-1.5 text-xs">
+<div class="px-3 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Project & Storage</div>
+<button onclick="openAppConfigModal()" class="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-blue-400 flex items-center gap-3 font-medium cursor-pointer transition-colors">
+<i class="fa-solid fa-sliders w-4 text-blue-400 pointer-events-none"></i> App Icon & Metadata
+</button>
+<button onclick="triggerFolderSelect()" class="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-amber-400 flex items-center gap-3 font-medium cursor-pointer transition-colors">
+<i class="fa-solid fa-folder-open w-4 text-amber-400 pointer-events-none"></i> Open Storage Folder
+</button>
+<div class="border-t border-zinc-800 my-1"></div>
+<div class="px-3 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Execution Actions</div>
+<button onclick="openAppPreview()" class="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-emerald-400 flex items-center gap-3 font-medium cursor-pointer transition-colors">
+<i class="fa-solid fa-play w-4 text-emerald-400 pointer-events-none"></i> Live Render Preview
+</button>
+<button onclick="requestCloudAPKBuild()" class="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-purple-400 flex items-center gap-3 font-medium cursor-pointer transition-colors">
+<i class="fa-solid fa-android w-4 text-emerald-400 pointer-events-none"></i> Generate APK (Cloud Build)
+</button>
+<button onclick="openTerminalDrawer()" class="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-zinc-200 flex items-center gap-3 font-medium cursor-pointer transition-colors">
+<i class="fa-solid fa-terminal w-4 text-amber-400 pointer-events-none"></i> Terminal Output
+</button>
+<button onclick="downloadEditorCode()" class="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-cyan-400 flex items-center gap-3 font-medium cursor-pointer transition-colors">
+<i class="fa-solid fa-download w-4 text-cyan-400 pointer-events-none"></i> Code Download
+</button>
+<button onclick="openAdMobModal()" class="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-green-400 flex items-center gap-3 font-medium cursor-pointer transition-colors">
+<i class="fa-solid fa-dollar-sign w-4 text-green-400 pointer-events-none"></i> AdMob – Add & Earn Money
+</button>
+<div class="border-t border-zinc-800 my-1"></div>
+<div class="px-3 py-2">
+<div class="text-[9px] font-semibold text-zinc-600 uppercase tracking-wider mb-1.5">Founder</div>
+<div class="flex items-center gap-2.5 bg-gradient-to-r from-purple-900/30 to-fuchsia-900/20 border border-purple-700/40 rounded-lg p-2">
+<div class="w-8 h-8 rounded-lg bg-purple-600/30 border border-purple-500/50 flex items-center justify-center text-purple-300 shrink-0">
+<i class="fa-solid fa-crown text-xs"></i>
+</div>
+<div class="min-w-0">
+<div class="text-[11px] font-bold text-purple-200 truncate">Founder Name</div>
+<div class="text-[9px] text-purple-300/70 truncate">Web App Studio</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</header>
+
+<div class="flex-1 flex overflow-hidden relative">
+<main class="flex-1 flex flex-col bg-[#141416] overflow-hidden">
+<div class="bg-[#18181b] flex items-center justify-between px-4 py-2 border-b border-zinc-800 text-xs">
+<div class="flex items-center gap-2 bg-[#141416] text-emerald-400 px-3.5 py-1.5 rounded-t-lg border-t-2 border-emerald-500 font-medium shadow-inner">
+<i class="fa-solid fa-code text-sm"></i>
+<span id="activeFileName">index.html</span>
+</div>
+<div class="text-[11px] text-zinc-400 font-mono">HTML5 / CSS / JS</div>
+</div>
+<div class="flex-1 flex overflow-hidden relative">
+<div id="lineNumbers" class="w-12 bg-[#121214] text-zinc-600 text-right pr-3 py-4 code-font text-xs select-none border-r border-zinc-800/60 overflow-hidden leading-relaxed">
+1
+</div>
+<div class="flex-1 relative overflow-hidden bg-[#141416]">
+<div id="lineHighlightOverlay"></div>
+<textarea id="codeEditor" oninput="onCodeInput()" onscroll="syncEditorScroll()" spellcheck="false" class="absolute inset-0 w-full h-full p-4 code-font text-xs z-10 selection:bg-emerald-600/40"></textarea>
+</div>
+</div>
+</main>
+</div>
+
+<div id="menuBackdrop" onclick="hideDropdownMenu()" class="fixed inset-0 z-10 hidden"></div>
+<div id="drawerBackdrop" onclick="closeExplorerDrawer()" class="fixed inset-0 bg-black/70 backdrop-blur-xs z-10 hidden transition-all"></div>
+
+<aside id="explorerDrawer" class="fixed top-0 left-0 bottom-0 w-72 bg-[#18181b] border-r border-zinc-800 z-30 transform -translate-x-full transition-transform duration-200 flex flex-col shadow-2xl">
+<div class="p-4 bg-[#1f1f23] border-b border-zinc-800 flex items-center justify-between">
+<div class="flex items-center gap-2 text-zinc-200 text-xs font-bold uppercase tracking-wider">
+<i class="fa-solid fa-folder-tree text-amber-400"></i>
+<span>Project Explorer</span>
+</div>
+<div class="flex items-center gap-1.5">
+<button onclick="createNewFile()" class="p-1.5 hover:bg-zinc-700 rounded-lg text-zinc-400 hover:text-white transition-colors text-xs" title="New File">
+<i class="fa-solid fa-file-circle-plus"></i>
+</button>
+<button onclick="createNewFolder()" class="p-1.5 hover:bg-zinc-700 rounded-lg text-amber-400 hover:text-amber-300 transition-colors text-xs" title="New Folder">
+<i class="fa-solid fa-folder-plus"></i>
+</button>
+<button onclick="triggerFolderSelect()" class="p-1.5 hover:bg-zinc-700 rounded-lg text-zinc-400 hover:text-white transition-colors text-xs" title="Open Local Storage Folder">
+<i class="fa-solid fa-folder-open text-amber-400"></i>
+</button>
+<button onclick="closeExplorerDrawer()" class="p-1.5 hover:bg-zinc-700 rounded-lg text-zinc-400 hover:text-white transition-colors text-xs" title="Close Drawer">
+<i class="fa-solid fa-xmark"></i>
+</button>
+</div>
+</div>
+<div class="p-3 border-b border-zinc-800/80 text-xs text-zinc-400 flex items-center justify-between cursor-pointer hover:bg-zinc-800/50" onclick="openAppConfigModal()" title="Click to Change App Icon & Settings">
+<span class="font-bold text-zinc-200 truncate" id="currentProjectTitle"><i class="fa-solid fa-box text-emerald-400 mr-1.5"></i> my_web_app</span>
+<span class="text-[10px] text-blue-400 font-medium hover:underline"><i class="fa-solid fa-gear"></i> Settings</span>
+</div>
+<div id="fileTreeContainer" class="flex-1 overflow-y-auto p-2.5 text-xs space-y-1"></div>
+</aside>
+
+<!-- ================= AI CHAT DRAWER ================= -->
+<aside id="aiChatDrawer" class="fixed top-0 right-0 bottom-0 w-full sm:w-96 bg-[#18181b] border-l border-zinc-800 z-40 transform translate-x-full transition-transform duration-200 flex flex-col shadow-2xl">
+<div class="p-3.5 bg-gradient-to-r from-purple-900/40 to-fuchsia-900/30 border-b border-zinc-800 flex items-center justify-between">
+<div class="flex items-center gap-2 text-zinc-100 text-xs font-bold uppercase tracking-wider">
+<div class="w-7 h-7 rounded-lg bg-purple-600/30 border border-purple-500/40 flex items-center justify-center text-purple-300">
+<i class="fa-solid fa-robot text-xs"></i>
+</div>
+<div>
+<div>AI Code Assistant</div>
+<div class="text-[9px] text-purple-300/70 font-normal normal-case tracking-normal">index.html Editor</div>
+</div>
+</div>
+<div class="flex items-center gap-1">
+<button onclick="clearAIChat()" class="p-1.5 hover:bg-zinc-700/60 rounded-lg text-zinc-400 hover:text-white transition-colors text-xs" title="Clear Chat">
+<i class="fa-solid fa-broom"></i>
+</button>
+<button onclick="closeAIChatDrawer()" class="p-1.5 hover:bg-zinc-700/60 rounded-lg text-zinc-400 hover:text-white transition-colors text-xs" title="Close">
+<i class="fa-solid fa-xmark"></i>
+</button>
+</div>
+</div>
+<div class="px-3 py-2 bg-[#1a1a1e] border-b border-zinc-800 flex items-center justify-between text-[10px]">
+<div class="flex items-center gap-1.5 text-zinc-400">
+<i class="fa-solid fa-file-code text-emerald-400"></i>
+<span>Editing: <span id="aiContextFile" class="text-emerald-400 font-mono">index.html</span></span>
+</div>
+<label class="flex items-center gap-1.5 cursor-not-allowed text-zinc-600">
+<input type="checkbox" id="aiAutoApply" class="accent-purple-500 w-3 h-3" checked disabled>
+<span>Auto-apply</span>
+</label>
+</div>
+<div id="aiChatMessages" class="flex-1 overflow-y-auto p-3 space-y-3 text-xs select-text">
+<div class="ai-chat-msg flex gap-2">
+<div class="w-6 h-6 rounded-md bg-purple-600/30 border border-purple-500/40 flex items-center justify-center shrink-0">
+<i class="fa-solid fa-robot text-purple-300 text-[10px]"></i>
+</div>
+<div class="flex-1 min-w-0">
+<div class="text-[10px] font-semibold text-purple-300 mb-1">AI Assistant</div>
+<div class="bg-[#1f1f23] rounded-xl rounded-tl-sm p-2.5 text-zinc-300 leading-relaxed">
+👋 Hi! Main aapka <b class="text-purple-200">AI Code Assistant</b> hoon. Kuch bhi poochhiye — code improve, debug, explain, ya naya app banao.
+<div class="mt-1.5 text-[11px] text-zinc-400">Pehle <b class="text-purple-300">AI Settings</b> me apni API key add karein — phir chat shuru karein.</div>
+<div class="mt-1.5 text-[10px] text-zinc-500">💡 <b class="text-blue-300">DeepSeek</b> shortcut available hai — click karke official website new tab me kholen.</div>
+</div>
+</div>
+</div>
+</div>
+<div class="px-3 py-2 border-t border-zinc-800/60 flex gap-1.5 overflow-x-auto">
+<button onclick="aiQuickAction('Improve the design and make it modern & responsive')" class="shrink-0 px-2.5 py-1 bg-zinc-800 hover:bg-purple-600/30 border border-zinc-700 hover:border-purple-500/50 rounded-lg text-[10px] text-zinc-300 hover:text-purple-300 transition-colors">
+<i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Improve
+</button>
+<button onclick="aiQuickAction('Fix all syntax errors and bugs in index.html')" class="shrink-0 px-2.5 py-1 bg-zinc-800 hover:bg-red-600/30 border border-zinc-700 hover:border-red-500/50 rounded-lg text-[10px] text-zinc-300 hover:text-red-300 transition-colors">
+<i class="fa-solid fa-bug mr-1"></i>Fix Errors
+</button>
+<button onclick="aiQuickAction('Purana code hata do aur ek complete calculator app banao is index.html me (CSS + JS sab andar)')" class="shrink-0 px-2.5 py-1 bg-zinc-800 hover:bg-emerald-600/30 border border-zinc-700 hover:border-emerald-500/50 rounded-lg text-[10px] text-zinc-300 hover:text-emerald-300 transition-colors">
+<i class="fa-solid fa-calculator mr-1"></i>Calculator
+</button>
+<button onclick="aiQuickAction('Explain what this index.html does and how it works')" class="shrink-0 px-2.5 py-1 bg-zinc-800 hover:bg-blue-600/30 border border-zinc-700 hover:border-blue-500/50 rounded-lg text-[10px] text-zinc-300 hover:text-blue-300 transition-colors">
+<i class="fa-solid fa-book-open mr-1"></i>Explain
+</button>
+</div>
+<div class="p-3 bg-[#1a1a1e] border-t border-zinc-800">
+<div class="flex items-center justify-between gap-2 mb-2">
+<span class="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">Provider</span>
+<div class="flex items-center gap-1 flex-wrap">
+<button type="button" data-provider="openai" onclick="selectAIProvider('openai')" class="provider-btn px-2 py-1 rounded-md text-[10px] font-medium border bg-zinc-800 text-zinc-400 border-zinc-700 hover:bg-zinc-700 transition-colors cursor-pointer">OpenAI</button>
+<button type="button" data-provider="groq" onclick="selectAIProvider('groq')" class="provider-btn px-2 py-1 rounded-md text-[10px] font-medium border bg-zinc-800 text-zinc-400 border-zinc-700 hover:bg-zinc-700 transition-colors cursor-pointer">Groq</button>
+<button type="button" data-provider="gemini" onclick="selectAIProvider('gemini')" class="provider-btn px-2 py-1 rounded-md text-[10px] font-medium border bg-zinc-800 text-zinc-400 border-zinc-700 hover:bg-zinc-700 transition-colors cursor-pointer">Gemini</button>
+<button type="button" data-provider="deepseek" onclick="selectAIProvider('deepseek')" class="provider-btn px-2 py-1 rounded-md text-[10px] font-medium border bg-zinc-800 text-zinc-400 border-zinc-700 hover:bg-zinc-700 transition-colors cursor-pointer" title="Opens DeepSeek official website in a new tab"><i class="fa-solid fa-globe text-[9px] mr-1"></i>DeepSeek</button>
+</div>
+</div>
+<div class="flex items-end gap-2 bg-[#121214] border border-zinc-700 focus-within:border-purple-500/60 rounded-xl p-2 transition-colors">
+<textarea id="aiChatInput" rows="1" placeholder="Ask AI to build, fix, or explain code..." class="flex-1 bg-transparent text-xs text-zinc-200 placeholder-zinc-600 outline-none resize-none code-font max-h-32 px-1 py-1" onkeydown="handleAIInputKey(event)" oninput="autoResizeAIInput(this)"></textarea>
+<button onclick="sendAIMessage()" id="aiSendBtn" class="w-8 h-8 rounded-lg bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center transition-colors shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" title="Send message">
+<i class="fa-solid fa-paper-plane text-xs"></i>
+</button>
+</div>
+<div class="mt-1.5 text-[9px] flex items-center justify-between gap-2">
+<span id="aiProviderStatus" class="flex items-center gap-1.5 text-zinc-500 truncate">
+<span class="inline-block w-1.5 h-1.5 rounded-full bg-zinc-500"></span>
+<span>Ready</span>
+</span>
+<span id="aiStatusText" class="text-zinc-600 truncate"></span>
+</div>
+<button onclick="openAISettingsModal()" class="mt-2.5 w-full px-3 py-2 bg-gradient-to-r from-purple-600/20 to-fuchsia-600/20 hover:from-purple-600/30 hover:to-fuchsia-600/30 border border-purple-500/40 hover:border-purple-400/60 rounded-lg text-[11px] text-purple-200 hover:text-white font-medium flex items-center justify-center gap-2 transition-all cursor-pointer">
+<i class="fa-solid fa-key text-[10px]"></i>
+<span>AI Settings — Add Your Own API Key</span>
+<i class="fa-solid fa-chevron-right text-[9px] opacity-60"></i>
+</button>
+</div>
+</aside>
+
+<!-- SEARCH CODE MODAL -->
+<div id="searchCodeModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+<div class="bg-[#18181b] border border-zinc-700/80 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+<div class="px-5 py-4 bg-[#1f1f23] border-b border-zinc-800 flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-7 h-7 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+<i class="fa-solid fa-magnifying-glass text-xs"></i>
+</div>
+<h3 class="text-sm font-bold text-zinc-100">Search Code</h3>
+</div>
+<button onclick="closeSearchModal()" class="text-zinc-400 hover:text-white p-1.5 rounded-lg hover:bg-zinc-800">
+<i class="fa-solid fa-xmark text-sm"></i>
+</button>
+</div>
+<div class="p-5 space-y-3 text-xs">
+<p class="text-zinc-400 text-[11px]">Code ka koi jumla likhein — us line pe jump hoga aur border highlight hoga.</p>
+<div>
+<label class="block font-medium text-zinc-300 mb-1.5">Search Text</label>
+<input type="text" id="searchCodeInput" placeholder="e.g. function sayHello, &lt;div class, color:" class="w-full px-3.5 py-2 bg-[#121214] border border-zinc-800 rounded-xl text-zinc-200 outline-none focus:border-blue-500/60 transition-colors font-mono" onkeydown="if(event.key==='Enter') performSearch()" oninput="updateSearchPreview()">
+</div>
+<div id="searchPreviewBox" class="hidden bg-[#0f0f11] border border-zinc-800 rounded-lg p-2.5 max-h-40 overflow-y-auto">
+<div class="text-[10px] text-zinc-500 mb-1.5 flex items-center justify-between">
+<span>Matches: <span id="searchMatchCount" class="text-emerald-400 font-mono">0</span></span>
+<span id="searchMatchIndex" class="text-zinc-400 font-mono">-</span>
+</div>
+<div id="searchMatchList" class="space-y-1"></div>
+</div>
+<div class="flex items-center justify-between text-[10px] text-zinc-500">
+<span>Total lines: <span id="searchTotalLines" class="text-zinc-300 font-mono">0</span></span>
+<button onclick="performSearch()" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium text-[11px] flex items-center gap-1.5">
+<i class="fa-solid fa-arrow-right"></i> Search
+</button>
+</div>
+</div>
+</div>
+</div>
+
+<!-- TERMINAL DRAWER (with NEW R2 progress bar) -->
+<div id="terminalDrawer" class="fixed bottom-0 left-0 right-0 h-56 bg-[#0f0f11] border-t border-zinc-800 z-50 transform translate-y-full transition-transform duration-200 flex flex-col shadow-2xl">
+<div class="bg-[#18181b] px-4 py-2 border-b border-zinc-800 flex items-center justify-between text-xs">
+<div class="flex items-center gap-2 text-zinc-300 font-mono text-[11px]">
+<i class="fa-solid fa-terminal text-emerald-400"></i>
+<span>Terminal Output & Logs</span>
+</div>
+<div class="flex items-center gap-2">
+<button onclick="clearTerminal()" class="text-[10px] text-zinc-400 hover:text-white px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 rounded transition-colors">Clear</button>
+<button onclick="toggleTerminalDrawer()" class="text-zinc-400 hover:text-white p-1">
+<i class="fa-solid fa-xmark"></i>
+</button>
+</div>
+</div>
+<div id="terminalOutput" class="flex-1 p-4 code-font text-xs overflow-y-auto whitespace-pre-wrap text-zinc-300 select-text leading-relaxed">
+[System] Connected to Vercel backend server.
+Native HTML/CSS/JS execution engine active.
+</div>
+<div id="r2UploadProgressWrap" class="hidden mx-4 mb-3">
+<div class="flex items-center justify-between mb-1.5">
+<span class="text-[10px] text-zinc-400" id="r2UploadProgressLabel">Uploading...</span>
+<span class="text-[10px] text-blue-400 font-mono" id="r2UploadProgressPercent">0%</span>
+</div>
+<div class="w-full bg-zinc-800 rounded-full overflow-hidden" style="height: 6px;">
+<div id="r2UploadProgressBar"></div>
+</div>
+</div>
+</div>
+
+<div id="previewModal" class="fixed inset-0 bg-black/95 backdrop-blur-md z-50 hidden flex-col items-center justify-center p-0 sm:p-4">
+<div class="w-full h-full sm:max-w-sm sm:h-[620px] bg-slate-950 sm:rounded-2xl overflow-hidden shadow-2xl flex flex-col border border-zinc-800">
+<div class="bg-zinc-900 px-4 py-2.5 flex items-center justify-between border-b border-zinc-800">
+<span class="text-xs font-semibold text-zinc-300 flex items-center gap-2">
+<i class="fa-solid fa-bolt text-emerald-400"></i> Native Web Preview
+</span>
+<button onclick="closeAppPreview()" class="text-zinc-400 hover:text-white p-1.5 cursor-pointer rounded-lg hover:bg-zinc-800">
+<i class="fa-solid fa-xmark text-sm"></i>
+</button>
+</div>
+<iframe id="previewFrame" class="flex-1 w-full h-full border-none bg-white"></iframe>
+</div>
+</div>
+
+<div id="appConfigModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+<div class="bg-[#18181b] border border-zinc-700/80 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col">
+<div class="px-5 py-4 bg-[#1f1f23] border-b border-zinc-800 flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-7 h-7 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+<i class="fa-solid fa-sliders text-xs"></i>
+</div>
+<h3 class="text-sm font-bold text-zinc-100">App Name & Icon Configuration</h3>
+</div>
+<button onclick="closeAppConfigModal()" class="text-zinc-400 hover:text-white p-1.5 rounded-lg hover:bg-zinc-800">
+<i class="fa-solid fa-xmark text-sm"></i>
+</button>
+</div>
+<div class="p-5 space-y-4 text-xs">
+<div>
+<label class="block font-medium text-zinc-300 mb-2">App Icon Image</label>
+<div class="flex items-center gap-4 bg-[#121214] p-3 rounded-xl border border-zinc-800">
+<div class="w-14 h-14 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center overflow-hidden shrink-0 relative group">
+<i id="modalIconFallback" class="fa-solid fa-image text-xl text-zinc-500"></i>
+<img id="modalIconPreview" class="w-full h-full object-cover hidden" alt="Preview Icon" />
+</div>
+<div class="flex-1">
+<input type="file" id="appIconInput" accept="image/*" class="hidden" onchange="handleAppIconSelect(event)">
+<button onclick="document.getElementById('appIconInput').click()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors cursor-pointer text-xs flex items-center gap-2">
+<i class="fa-solid fa-upload"></i> Upload Image
+</button>
+<p class="text-[10px] text-zinc-500 mt-1.5">PNG or JPG recommended (e.g. 512x512)</p>
+</div>
+</div>
+</div>
+<div>
+<label class="block font-medium text-zinc-300 mb-1">App Title Name</label>
+<input type="text" id="configAppNameInput" placeholder="e.g. My Custom App" class="w-full px-3.5 py-2 bg-[#121214] border border-zinc-800 rounded-xl text-zinc-200 outline-none focus:border-blue-500/60 transition-colors">
+</div>
+<div>
+<label class="block font-medium text-zinc-300 mb-1">Package Name / ID</label>
+<input type="text" id="configAppPackageInput" placeholder="com.company.myapp" class="w-full px-3.5 py-2 bg-[#121214] border border-zinc-800 rounded-xl text-zinc-200 outline-none focus:border-blue-500/60 transition-colors font-mono">
+</div>
+<div>
+<label class="block font-medium text-zinc-300 mb-1">App Version</label>
+<input type="text" id="configAppVersionInput" placeholder="1.0.0" class="w-full px-3.5 py-2 bg-[#121214] border border-zinc-800 rounded-xl text-zinc-200 outline-none focus:border-blue-500/60 transition-colors font-mono">
+</div>
+</div>
+<div class="px-5 py-3.5 bg-[#1f1f23] border-t border-zinc-800 flex items-center justify-end gap-2">
+<button onclick="closeAppConfigModal()" class="px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-xs font-medium transition-colors">Cancel</button>
+<button onclick="saveAppConfiguration()" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5">
+<i class="fa-solid fa-check"></i> Save Settings
+</button>
+</div>
+</div>
+</div>
+
+<!-- AdMob Configuration Modal -->
+<div id="admobConfigModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+<div class="bg-[#18181b] border border-zinc-700/80 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+<div class="px-5 py-4 bg-gradient-to-r from-green-900/40 to-emerald-900/30 border-b border-zinc-800 flex items-center justify-between shrink-0">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-green-600/20 border border-green-500/40 flex items-center justify-center text-green-400">
+<i class="fa-solid fa-dollar-sign text-sm"></i>
+</div>
+<div>
+<h3 class="text-sm font-bold text-zinc-100">AdMob – Add & Earn Money</h3>
+<div class="text-[9px] text-green-300/70">Monetize your app with Google AdMob</div>
+</div>
+</div>
+<button onclick="closeAdMobModal()" class="text-zinc-400 hover:text-white p-1.5 rounded-lg hover:bg-zinc-800">
+<i class="fa-solid fa-xmark text-sm"></i>
+</button>
+</div>
+<div class="p-5 space-y-4 text-xs overflow-y-auto flex-1">
+<div class="flex items-center justify-between bg-[#121214] p-3 rounded-xl border border-zinc-800">
+<div>
+<div class="font-semibold text-zinc-200">Enable AdMob</div>
+<div class="text-[10px] text-zinc-500 mt-0.5">Banner, Interstitial, Rewarded ads enable karo</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input type="checkbox" id="admobEnabledToggle" class="sr-only peer" onchange="updateAdMobModalState()">
+<div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+</label>
+</div>
+<div class="flex items-center justify-between bg-[#121214] p-3 rounded-xl border border-zinc-800">
+<div>
+<div class="font-semibold text-zinc-200">Test Ads Mode</div>
+<div class="text-[10px] text-zinc-500 mt-0.5">Google official test IDs use honge (no real revenue)</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input type="checkbox" id="admobTestModeToggle" class="sr-only peer" onchange="updateAdMobModalState()">
+<div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+</label>
+</div>
+<div id="admobTestInfo" class="bg-amber-900/20 border border-amber-700/40 rounded-lg p-2.5 text-[10px] text-amber-200 leading-relaxed">
+<b>🧪 Test Mode ON:</b> Google ke official test AdMob IDs use ho rahe hain — real revenue nahi milega, sirf development/testing ke liye safe hai.
+</div>
+<div id="admobIdsSection" class="space-y-3">
+<div>
+<label class="block font-medium text-zinc-300 mb-1">AdMob App ID</label>
+<input type="text" id="admobAppIdInput" placeholder="ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX" class="w-full px-3.5 py-2 bg-[#121214] border border-zinc-800 rounded-xl text-zinc-200 outline-none focus:border-green-500/60 transition-colors font-mono text-[11px]">
+<p class="text-[9px] text-zinc-500 mt-1">Format: ca-app-pub-[16 digits]~[10 digits]</p>
+</div>
+<div>
+<label class="block font-medium text-zinc-300 mb-1">Banner Ad Unit ID</label>
+<input type="text" id="admobBannerIdInput" placeholder="ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX" class="w-full px-3.5 py-2 bg-[#121214] border border-zinc-800 rounded-xl text-zinc-200 outline-none focus:border-green-500/60 transition-colors font-mono text-[11px]">
+</div>
+<div>
+<label class="block font-medium text-zinc-300 mb-1">Interstitial Ad Unit ID</label>
+<input type="text" id="admobInterstitialIdInput" placeholder="ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX" class="w-full px-3.5 py-2 bg-[#121214] border border-zinc-800 rounded-xl text-zinc-200 outline-none focus:border-green-500/60 transition-colors font-mono text-[11px]">
+</div>
+<div>
+<label class="block font-medium text-zinc-300 mb-1">Rewarded Ad Unit ID</label>
+<input type="text" id="admobRewardedIdInput" placeholder="ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX" class="w-full px-3.5 py-2 bg-[#121214] border border-zinc-800 rounded-xl text-zinc-200 outline-none focus:border-green-500/60 transition-colors font-mono text-[11px]">
+</div>
+<div>
+<label class="block font-medium text-zinc-300 mb-1">Native Ad Unit ID</label>
+<input type="text" id="admobNativeIdInput" placeholder="ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX" class="w-full px-3.5 py-2 bg-[#121214] border border-zinc-800 rounded-xl text-zinc-200 outline-none focus:border-green-500/60 transition-colors font-mono text-[11px]">
+</div>
+<div>
+<label class="block font-medium text-zinc-300 mb-1">App Open Ad Unit ID</label>
+<input type="text" id="admobAppOpenIdInput" placeholder="ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX" class="w-full px-3.5 py-2 bg-[#121214] border border-zinc-800 rounded-xl text-zinc-200 outline-none focus:border-green-500/60 transition-colors font-mono text-[11px]">
+</div>
+</div>
+<div id="admobValidationMsg" class="hidden bg-red-900/30 border border-red-700/50 rounded-lg p-2.5 text-[10px] text-red-200"></div>
+<details class="bg-[#0f0f11] border border-zinc-800 rounded-lg">
+<summary class="px-3 py-2.5 text-[11px] text-zinc-300 cursor-pointer font-medium hover:text-white">📖 Ad Integration Guide — Copy-Paste Code</summary>
+<div class="px-3 py-2 space-y-3 text-[10px] text-zinc-400 border-t border-zinc-800">
+<div>
+<div class="text-emerald-400 font-bold mb-1">🖼️ Banner Ad:</div>
+<pre class="bg-black/60 p-2 rounded overflow-x-auto text-[9px] text-zinc-300">&lt;script&gt;
+  window.addEventListener('load', () =&gt; {
+    if (typeof showBanner === 'function') showBanner();
+  });
+&lt;/script&gt;</pre>
+</div>
+<div>
+<div class="text-emerald-400 font-bold mb-1">🎬 Interstitial Ad (button click):</div>
+<pre class="bg-black/60 p-2 rounded overflow-x-auto text-[9px] text-zinc-300">&lt;button onclick="showInterstitial()"&gt;
+  Show Ad
+&lt;/button&gt;</pre>
+</div>
+<div>
+<div class="text-emerald-400 font-bold mb-1">🎁 Rewarded Ad:</div>
+<pre class="bg-black/60 p-2 rounded overflow-x-auto text-[9px] text-zinc-300">&lt;button onclick="showRewarded()"&gt;
+  Watch &amp; Earn
+&lt;/button&gt;
+&lt;script&gt;
+  window.onAdRewardEarned = (amount, type) =&gt; {
+    alert('You earned ' + amount + ' ' + type + '!');
+  };
+&lt;/script&gt;</pre>
+</div>
+</div>
+</details>
+</div>
+<div class="px-5 py-3.5 bg-[#1f1f23] border-t border-zinc-800 flex items-center justify-end gap-2 shrink-0">
+<button onclick="closeAdMobModal()" class="px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-xs font-medium transition-colors">Cancel</button>
+<button onclick="saveAdMobSettings()" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5">
+<i class="fa-solid fa-check"></i> Save AdMob Settings
+</button>
+</div>
+</div>
+</div>
+
+<!-- ================= AI SETTINGS MODAL ================= -->
+<div id="aiSettingsModal" class="fixed inset-0 bg-black/85 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-3 sm:p-4">
+<div class="bg-[#18181b] border border-zinc-700/80 rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[94vh] overflow-hidden">
+<div class="px-4 sm:px-5 py-3.5 bg-gradient-to-r from-purple-900/40 to-fuchsia-900/30 border-b border-zinc-800 flex items-center justify-between shrink-0">
+<div class="flex items-center gap-2.5 min-w-0">
+<div class="w-8 h-8 rounded-lg bg-purple-600/30 border border-purple-500/40 flex items-center justify-center text-purple-300 shrink-0">
+<i class="fa-solid fa-key text-sm"></i>
+</div>
+<div class="min-w-0">
+<h3 class="text-sm font-bold text-zinc-100 truncate">AI Settings — Bring Your Own Key</h3>
+<div class="text-[9px] text-purple-300/70 truncate">Apni API key add karein — 100% private, browser me save hoti hai</div>
+</div>
+</div>
+<button onclick="closeAISettingsModal()" class="text-zinc-400 hover:text-white p-1.5 rounded-lg hover:bg-zinc-800 shrink-0">
+<i class="fa-solid fa-xmark text-sm"></i>
+</button>
+</div>
+
+<div class="bg-[#1a1a1e] border-b border-zinc-800 px-2 sm:px-4 flex gap-1 overflow-x-auto shrink-0" id="aiSettingsTabs">
+<button data-provider="openai" onclick="switchAISettingsTab('openai')" class="ai-settings-tab shrink-0 px-3 py-2.5 text-[11px] font-medium border-b-2 border-transparent text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">
+<i class="fa-solid fa-bolt mr-1.5 text-[10px]"></i>OpenAI
+</button>
+<button data-provider="groq" onclick="switchAISettingsTab('groq')" class="ai-settings-tab shrink-0 px-3 py-2.5 text-[11px] font-medium border-b-2 border-transparent text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">
+<i class="fa-solid fa-bolt mr-1.5 text-[10px]"></i>Groq
+</button>
+<button data-provider="gemini" onclick="switchAISettingsTab('gemini')" class="ai-settings-tab shrink-0 px-3 py-2.5 text-[11px] font-medium border-b-2 border-transparent text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer">
+<i class="fa-solid fa-bolt mr-1.5 text-[10px]"></i>Gemini
+</button>
+</div>
+
+<div class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5 text-xs">
+<div class="bg-blue-900/20 border border-blue-700/40 rounded-lg p-2.5 text-[10px] text-blue-200 leading-relaxed">
+<i class="fa-solid fa-shield-halved mr-1"></i>
+<b>Privacy:</b> Aapki API key sirf aapke browser ke localStorage me save hoti hai. Ye kabhi bhi kisi backend, database, ya server pe nahi bheji jaati. Sirf selected provider ke API endpoint pe direct jaaegi.
+</div>
+
+<div id="aiSettingsForm">
+<div>
+<label class="block font-medium text-zinc-300 mb-1.5">
+<span id="aiSettingsKeyLabel">API Key</span>
+<span class="text-red-400">*</span>
+</label>
+<div class="relative">
+<input type="password" id="aiSettingsKeyInput" placeholder="Enter your API key" class="w-full px-3.5 py-2.5 pr-10 bg-[#121214] border border-zinc-700 rounded-xl text-zinc-200 outline-none focus:border-purple-500/60 transition-colors font-mono text-[11px]" autocomplete="off" spellcheck="false">
+<button type="button" onclick="toggleAIKeyVisibility()" class="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 p-1.5 rounded transition-colors" title="Show / Hide">
+<i id="aiSettingsEyeIcon" class="fa-solid fa-eye text-[11px]"></i>
+</button>
+</div>
+<div class="mt-1 text-[9px] text-zinc-500 flex items-center justify-between">
+<span id="aiSettingsKeyHint">Get key from provider dashboard</span>
+<span id="aiSettingsKeyStatus" class="text-[9px]"></span>
+</div>
+</div>
+
+<div>
+<label class="block font-medium text-zinc-300 mb-1.5">Model</label>
+<div class="flex items-center gap-2">
+<select id="aiSettingsModelSelect" onchange="onAISettingsModelChange()" class="flex-1 px-3 py-2.5 bg-[#121214] border border-zinc-700 rounded-xl text-zinc-200 outline-none focus:border-purple-500/60 transition-colors text-[11px] font-mono">
+<option value="">— Load models to see options —</option>
+</select>
+<button type="button" onclick="refreshAIModels()" id="aiSettingsRefreshBtn" class="px-3 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-[11px] font-medium flex items-center gap-1.5 transition-colors shrink-0" title="Refresh models">
+<i class="fa-solid fa-rotate text-[10px]"></i> <span class="hidden sm:inline">Refresh</span>
+</button>
+</div>
+<div class="mt-1 text-[9px] text-zinc-500" id="aiSettingsModelsStatus">Select a provider, then refresh to load real models.</div>
+</div>
+
+<div>
+<label class="block font-medium text-zinc-300 mb-1.5">Custom Model ID <span class="text-zinc-500 font-normal">(optional)</span></label>
+<input type="text" id="aiSettingsCustomModelInput" placeholder="e.g. gpt-4o-mini-2024-07-18" class="w-full px-3.5 py-2.5 bg-[#121214] border border-zinc-700 rounded-xl text-zinc-200 outline-none focus:border-purple-500/60 transition-colors font-mono text-[11px]" autocomplete="off" spellcheck="false">
+<div class="mt-1 text-[9px] text-zinc-500">Agar aapka model list me nahi hai to yahan exact ID type karein.</div>
+</div>
+
+<div id="aiSettingsTestResult" class="hidden rounded-lg p-2.5 text-[10px] leading-relaxed"></div>
+
+<div class="flex flex-col sm:flex-row gap-2 pt-2 border-t border-zinc-800">
+<button type="button" onclick="testAIKeyAndModel()" id="aiSettingsTestBtn" class="flex-1 px-3 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition-colors">
+<i class="fa-solid fa-flask-vial"></i> Test API Key & Model
+</button>
+<button type="button" onclick="saveAISettingsForCurrentProvider()" class="flex-1 px-3 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition-colors">
+<i class="fa-solid fa-floppy-disk"></i> Save Settings
+</button>
+</div>
+</div>
+</div>
+
+<div class="px-4 sm:px-5 py-3 bg-[#1f1f23] border-t border-zinc-800 flex items-center justify-between gap-2 shrink-0 text-[10px]">
+<div class="text-zinc-500 truncate" id="aiSettingsFooterStatus">
+<i class="fa-solid fa-lock mr-1 text-emerald-400"></i> Keys are stored locally on this device only
+</div>
+<button onclick="closeAISettingsModal()" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-xs font-medium transition-colors shrink-0">
+Close
+</button>
+</div>
+</div>
+</div>
+
+<!-- ANDROID ADS BRIDGE -->
+<script>
+function showBanner() {
+    if (typeof isAdMobReady === 'function' && !isAdMobReady()) {
+        console.log('[AdMob] Banner not shown (not ready)');
+        return false;
+    }
+    if (window.AndroidAds && typeof AndroidAds.showBanner === 'function') {
+        try { AndroidAds.showBanner(); return true; } catch(e) { console.warn(e); }
+    }
+    return false;
+}
+function hideBanner() {
+    if (window.AndroidAds && typeof AndroidAds.hideBanner === 'function') {
+        try { AndroidAds.hideBanner(); return true; } catch(e) {}
+    }
+    return false;
+}
+function showInterstitial() {
+    if (typeof isAdMobReady === 'function' && !isAdMobReady()) return false;
+    if (window.AndroidAds && typeof AndroidAds.showInterstitial === 'function') {
+        try { AndroidAds.showInterstitial(); return true; } catch(e) {}
+    }
+    return false;
+}
+function showRewarded() {
+    if (typeof isAdMobReady === 'function' && !isAdMobReady()) return false;
+    if (window.AndroidAds && typeof AndroidAds.showRewarded === 'function') {
+        try { AndroidAds.showRewarded(); return true; } catch(e) {}
+    }
+    return false;
+}
+function showNative() {
+    if (typeof isAdMobReady === 'function' && !isAdMobReady()) return false;
+    if (window.AndroidAds && typeof AndroidAds.showNative === 'function') {
+        try { AndroidAds.showNative(); return true; } catch(e) {}
+    }
+    return false;
+}
+function showAppOpen() {
+    if (typeof isAdMobReady === 'function' && !isAdMobReady()) return false;
+    if (window.AndroidAds && typeof AndroidAds.showAppOpen === 'function') {
+        try { AndroidAds.showAppOpen(); return true; } catch(e) {}
+    }
+    return false;
+}
+window.onAdRewardEarned = function(amount, type) {
+    console.log("Reward earned:", amount, type);
+};
+</script>
+<script>
+const BACKEND_URL = "https://apk-backend-ujf8.vercel.app/";
+const AI_CHAT_ENDPOINT = "https://apk-backend-ujf8.vercel.app/api/ai-chat";
+const socket = typeof io !== 'undefined' ? io(BACKEND_URL) : { on: () => {}, emit: () => {} };
+
+/* =========================================================
+   R2 UPLOAD STATE — duplicate prevention
+   ========================================================= */
+let __r2BuildInProgress = false;
+
+const TEST_ADMOB_IDS = {
+    appId: 'ca-app-pub-3940256099942544~3347511713',
+    bannerId: 'ca-app-pub-3940256099942544/6300978111',
+    interstitialId: 'ca-app-pub-3940256099942544/1033173712',
+    rewardedId: 'ca-app-pub-3940256099942544/5224354917',
+    nativeId: 'ca-app-pub-3940256099942544/2247696110',
+    appOpenId: 'ca-app-pub-3940256099942544/9257395921'
+};
+
+let appMetadata = {
+name: "Web App Studio",
+packageName: "com.studio.webapp",
+version: "1.0.0",
+iconDataUrl: null,
+adMob: {
+    enabled: false,
+    testMode: true,
+    appId: '',
+    bannerId: '',
+    interstitialId: '',
+    rewardedId: '',
+    nativeId: '',
+    appOpenId: ''
+}
+};
+
+let activeFile = "index.html";
+let virtualFileSystem = {
+"app.config.json": `{\n "appName": "Web App Studio",\n "packageName": "com.studio.webapp",\n "version": "1.0.0",\n "iconDataUrl": null,\n "adMob": {\n "enabled": false,\n "testMode": true\n }\n}`,
+"admob.config.json": `{\n "enabled": false,\n "testMode": true,\n "appId": "",\n "bannerId": "",\n "interstitialId": "",\n "rewardedId": "",\n "nativeId": "",\n "appOpenId": ""\n}`,
+"package.json": `{\n "name": "my-web-app",\n "version": "1.0.0",\n "description": "Native Web App & Game Project",\n "main": "index.html",\n "scripts": {\n "start": "live-server"\n },\n "dependencies": {}\n}`,
+"index.html": `<!DOCTYPE html>\n<html lang="en">\n<head>\n <meta charset="UTF-8">\n <meta name="viewport" content="width=device-width, initial-scale=1.0">\n <title>App Studio</title>\n <style>\n body {\n font-family: system-ui, sans-serif;\n background: #0f172a;\n color: white;\n display: flex;\n justify-content: center;\n align-items: center;\n min-height: 100vh;\n margin: 0;\n }\n .card {\n background: #1e293b;\n padding: 24px;\n border-radius: 16px;\n text-align: center;\n }\n .btn {\n background: #2563eb;\n color: white;\n border: none;\n padding: 10px 20px;\n border-radius: 8px;\n cursor: pointer;\n }\n </style>\n</head>\n<body>\n <div class="card">\n <h2>Web App Studio</h2>\n <p>Native Mobile & Responsive Environment</p>\n <button class="btn" onclick="sayHello()">Interactive Action</button>\n </div>\n <script>\n function sayHello() {\n alert('Hello from inline script!');\n }\n <\/script>\n</body>\n</html>`,
+"css": {
+"style.css": `body {\n font-family: system-ui, sans-serif;\n background: #0f172a;\n color: white;\n display: flex;\n justify-content: center;\n align-items: center;\n min-height: 100vh;\n margin: 0;\n}\n.card {\n background: #1e293b;\n padding: 24px;\n border-radius: 16px;\n text-align: center;\n}\n.btn {\n background: #2563eb;\n color: white;\n border: none;\n padding: 10px 20px;\n border-radius: 8px;\n cursor: pointer;\n}`
+},
+"js": {
+"app.js": `function sayHello() {\n alert('Hello from app.js module!');\n}`
+}
+};
+
+function saveToLocalStorage() {
+    try {
+        localStorage.setItem('was_vfs', JSON.stringify(virtualFileSystem));
+        localStorage.setItem('was_meta', JSON.stringify(appMetadata));
+        localStorage.setItem('was_activeFile', activeFile);
+        localStorage.setItem('was_admob', JSON.stringify(appMetadata.adMob || {}));
+    } catch(e) {}
+}
+function loadFromLocalStorage() {
+    try {
+        const vfs = localStorage.getItem('was_vfs');
+        const meta = localStorage.getItem('was_meta');
+        const active = localStorage.getItem('was_activeFile');
+        const admob = localStorage.getItem('was_admob');
+        if (vfs) {
+            const parsed = JSON.parse(vfs);
+            if (parsed && Object.keys(parsed).length > 0) virtualFileSystem = parsed;
+        }
+        if (meta) appMetadata = { ...appMetadata, ...JSON.parse(meta) };
+        if (active) activeFile = active;
+        if (admob) {
+            try { appMetadata.adMob = { ...appMetadata.adMob, ...JSON.parse(admob) }; } catch(e) {}
+        }
+        if (!appMetadata.adMob) {
+            appMetadata.adMob = { enabled:false, testMode:true, appId:'', bannerId:'', interstitialId:'', rewardedId:'', nativeId:'', appOpenId:'' };
+        }
+    } catch(e) {}
+}
+
+function validateAppId(id) {
+    return /^ca-app-pub-\d{16}~\d{10}$/.test(id || '');
+}
+function validateAdUnitId(id) {
+    return /^ca-app-pub-\d{16}\/\d{10}$/.test(id || '');
+}
+
+function getEffectiveAdMobConfig() {
+    const cfg = appMetadata.adMob || {};
+    const useTest = cfg.testMode !== false;
+    return {
+        enabled: !!cfg.enabled,
+        testMode: useTest,
+        appId: useTest ? TEST_ADMOB_IDS.appId : (cfg.appId || ''),
+        bannerId: useTest ? TEST_ADMOB_IDS.bannerId : (cfg.bannerId || ''),
+        interstitialId: useTest ? TEST_ADMOB_IDS.interstitialId : (cfg.interstitialId || ''),
+        rewardedId: useTest ? TEST_ADMOB_IDS.rewardedId : (cfg.rewardedId || ''),
+        nativeId: useTest ? TEST_ADMOB_IDS.nativeId : (cfg.nativeId || ''),
+        appOpenId: useTest ? TEST_ADMOB_IDS.appOpenId : (cfg.appOpenId || '')
+    };
+}
+
+function isAdMobReady() {
+    const cfg = appMetadata.adMob || {};
+    if (!cfg.enabled) return false;
+    if (window.AndroidAds) return true;
+    return false;
+}
+
+function openAdMobModal() {
+    window.hideDropdownMenu();
+    const cfg = appMetadata.adMob || {};
+    document.getElementById('admobEnabledToggle').checked = !!cfg.enabled;
+    document.getElementById('admobTestModeToggle').checked = cfg.testMode !== false;
+    document.getElementById('admobAppIdInput').value = cfg.appId || '';
+    document.getElementById('admobBannerIdInput').value = cfg.bannerId || '';
+    document.getElementById('admobInterstitialIdInput').value = cfg.interstitialId || '';
+    document.getElementById('admobRewardedIdInput').value = cfg.rewardedId || '';
+    document.getElementById('admobNativeIdInput').value = cfg.nativeId || '';
+    document.getElementById('admobAppOpenIdInput').value = cfg.appOpenId || '';
+    document.getElementById('admobValidationMsg').classList.add('hidden');
+    const modal = document.getElementById('admobConfigModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+    updateAdMobModalState();
+}
+
+function closeAdMobModal() {
+    const modal = document.getElementById('admobConfigModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+
+function updateAdMobModalState() {
+    const enabled = document.getElementById('admobEnabledToggle').checked;
+    const testMode = document.getElementById('admobTestModeToggle').checked;
+    const idsSection = document.getElementById('admobIdsSection');
+    const testInfo = document.getElementById('admobTestInfo');
+    if (idsSection) {
+        idsSection.style.opacity = enabled ? '1' : '0.4';
+        idsSection.style.pointerEvents = enabled ? 'auto' : 'none';
+    }
+    if (testInfo) testInfo.classList.toggle('hidden', !testMode);
+}
+
+function showAdMobValidationError(msg) {
+    const el = document.getElementById('admobValidationMsg');
+    if (el) {
+        el.textContent = msg;
+        el.classList.remove('hidden');
+    }
+}
+
+function saveAdMobSettings() {
+    const enabled = document.getElementById('admobEnabledToggle').checked;
+    const testMode = document.getElementById('admobTestModeToggle').checked;
+    const appId = document.getElementById('admobAppIdInput').value.trim();
+    const bannerId = document.getElementById('admobBannerIdInput').value.trim();
+    const interstitialId = document.getElementById('admobInterstitialIdInput').value.trim();
+    const rewardedId = document.getElementById('admobRewardedIdInput').value.trim();
+    const nativeId = document.getElementById('admobNativeIdInput').value.trim();
+    const appOpenId = document.getElementById('admobAppOpenIdInput').value.trim();
+
+    if (enabled && !testMode) {
+        if (appId && !validateAppId(appId)) { showAdMobValidationError('❌ Invalid AdMob App ID format.'); return; }
+        if (bannerId && !validateAdUnitId(bannerId)) { showAdMobValidationError('❌ Invalid Banner Ad Unit ID format.'); return; }
+        if (interstitialId && !validateAdUnitId(interstitialId)) { showAdMobValidationError('❌ Invalid Interstitial Ad Unit ID format.'); return; }
+        if (rewardedId && !validateAdUnitId(rewardedId)) { showAdMobValidationError('❌ Invalid Rewarded Ad Unit ID format.'); return; }
+        if (nativeId && !validateAdUnitId(nativeId)) { showAdMobValidationError('❌ Invalid Native Ad Unit ID format.'); return; }
+        if (appOpenId && !validateAdUnitId(appOpenId)) { showAdMobValidationError('❌ Invalid App Open Ad Unit ID format.'); return; }
+    }
+
+    appMetadata.adMob = { enabled, testMode, appId, bannerId, interstitialId, rewardedId, nativeId, appOpenId };
+    const effective = getEffectiveAdMobConfig();
+    virtualFileSystem['admob.config.json'] = JSON.stringify({
+        enabled: effective.enabled,
+        testMode: effective.testMode,
+        appId: effective.appId,
+        bannerId: effective.bannerId,
+        interstitialId: effective.interstitialId,
+        rewardedId: effective.rewardedId,
+        nativeId: effective.nativeId,
+        appOpenId: effective.appOpenId
+    }, null, 2);
+    try {
+        const cfg = JSON.parse(virtualFileSystem['app.config.json'] || '{}');
+        cfg.adMob = appMetadata.adMob;
+        virtualFileSystem['app.config.json'] = JSON.stringify(cfg, null, 2);
+    } catch(e) {}
+    saveToLocalStorage();
+    renderFileTree();
+    closeAdMobModal();
+    openTerminalDrawer();
+    logTerminalMessage(`📢 AdMob settings saved: Enabled=${enabled}, TestMode=${testMode}`);
+    if (window.AndroidAds) {
+        try {
+            if (typeof window.AndroidAds.configure === 'function') {
+                window.AndroidAds.configure(JSON.stringify(getEffectiveAdMobConfig()));
+            }
+            if (enabled && typeof window.AndroidAds.initialize === 'function') {
+                window.AndroidAds.initialize();
+            }
+        } catch(e) { console.warn('AdMob configure failed:', e); }
+    }
+}
+
+function syncAppConfigFromSystem() {
+if (virtualFileSystem["app.config.json"]) {
+try {
+const cfg = JSON.parse(virtualFileSystem["app.config.json"]);
+if (cfg.appName) appMetadata.name = cfg.appName;
+if (cfg.packageName) appMetadata.packageName = cfg.packageName;
+if (cfg.version) appMetadata.version = cfg.version;
+if (cfg.iconDataUrl) appMetadata.iconDataUrl = cfg.iconDataUrl;
+if (cfg.adMob) appMetadata.adMob = { ...appMetadata.adMob, ...cfg.adMob };
+const displayTitle = document.getElementById('displayAppName');
+if (displayTitle) displayTitle.innerText = appMetadata.name;
+const displayImg = document.getElementById('displayAppIconImg');
+const displayFallback = document.getElementById('displayAppIconFallback');
+if (appMetadata.iconDataUrl && displayImg && displayFallback) {
+displayImg.src = appMetadata.iconDataUrl;
+displayImg.classList.remove('hidden');
+displayFallback.classList.add('hidden');
+}
+} catch(e) {}
+}
+}
+
+function openAppConfigModal() {
+window.hideDropdownMenu();
+document.getElementById('configAppNameInput').value = appMetadata.name;
+document.getElementById('configAppPackageInput').value = appMetadata.packageName;
+document.getElementById('configAppVersionInput').value = appMetadata.version;
+const modalPreview = document.getElementById('modalIconPreview');
+const modalFallback = document.getElementById('modalIconFallback');
+if (appMetadata.iconDataUrl) {
+modalPreview.src = appMetadata.iconDataUrl;
+modalPreview.classList.remove('hidden');
+modalFallback.classList.add('hidden');
+} else {
+modalPreview.classList.add('hidden');
+modalFallback.classList.remove('hidden');
+}
+const modal = document.getElementById('appConfigModal');
+if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
+}
+
+function closeAppConfigModal() {
+const modal = document.getElementById('appConfigModal');
+if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+}
+
+function handleAppIconSelect(event) {
+const file = event.target.files[0];
+if (!file) return;
+const reader = new FileReader();
+reader.onload = function(e) {
+appMetadata.iconDataUrl = e.target.result;
+const modalPreview = document.getElementById('modalIconPreview');
+const modalFallback = document.getElementById('modalIconFallback');
+if (modalPreview && modalFallback) {
+modalPreview.src = appMetadata.iconDataUrl;
+modalPreview.classList.remove('hidden');
+modalFallback.classList.add('hidden');
+}
+};
+reader.readAsDataURL(file);
+}
+
+function saveAppConfiguration() {
+const newName = document.getElementById('configAppNameInput').value.trim();
+const newPkg = document.getElementById('configAppPackageInput').value.trim();
+const newVer = document.getElementById('configAppVersionInput').value.trim();
+if (newName) appMetadata.name = newName;
+if (newPkg) appMetadata.packageName = newPkg;
+if (newVer) appMetadata.version = newVer;
+const configJsonObj = {
+appName: appMetadata.name,
+packageName: appMetadata.packageName,
+version: appMetadata.version,
+iconDataUrl: appMetadata.iconDataUrl,
+adMob: appMetadata.adMob
+};
+virtualFileSystem["app.config.json"] = JSON.stringify(configJsonObj, null, 2);
+const displayTitle = document.getElementById('displayAppName');
+if (displayTitle) displayTitle.innerText = appMetadata.name;
+const displayImg = document.getElementById('displayAppIconImg');
+const displayFallback = document.getElementById('displayAppIconFallback');
+if (appMetadata.iconDataUrl && displayImg && displayFallback) {
+displayImg.src = appMetadata.iconDataUrl;
+displayImg.classList.remove('hidden');
+displayFallback.classList.add('hidden');
+}
+if (virtualFileSystem["package.json"]) {
+try {
+let pkgObj = JSON.parse(virtualFileSystem["package.json"]);
+pkgObj.name = appMetadata.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+pkgObj.version = appMetadata.version;
+virtualFileSystem["package.json"] = JSON.stringify(pkgObj, null, 2);
+} catch(err) {}
+}
+saveToLocalStorage();
+renderFileTree();
+closeAppConfigModal();
+openTerminalDrawer();
+logTerminalMessage(`🎨 App settings updated & written to app.config.json: App Name="${appMetadata.name}"`);
+}
+
+function flattenVirtualFiles(obj, prefix = '') {
+let result = {};
+for (let key in obj) {
+let path = prefix ? `${prefix}/${key}` : key;
+if (typeof obj[key] === 'object' && obj[key] !== null) {
+Object.assign(result, flattenVirtualFiles(obj[key], path));
+} else if (typeof obj[key] === 'string') {
+result[path] = obj[key];
+}
+}
+return result;
+}
+
+function resolveAliasPath(importPath, allFiles) {
+let clean = importPath.trim().replace(/['"]/g, '');
+if (clean.startsWith('@/')) clean = 'src/' + clean.substring(2);
+else if (clean.startsWith('Crikzone/')) clean = clean.substring('Crikzone/'.length);
+if (allFiles[clean]) return clean;
+const exts = ['.jsx', '.js', '.tsx', '.ts', '.json', '/index.jsx', '/index.js'];
+for (let ext of exts) {
+if (allFiles[clean + ext]) return clean + ext;
+}
+return null;
+}
+
+function closeAppPreview() {
+const modal = document.getElementById('previewModal');
+if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+}
+
+function openAppPreview() {
+window.hideDropdownMenu();
+const modal = document.getElementById('previewModal');
+const iframe = document.getElementById('previewFrame');
+const allFiles = flattenVirtualFiles(virtualFileSystem);
+if (iframe) {
+let isReactProject = Object.keys(allFiles).some(f => f.endsWith('.jsx') || f.endsWith('.tsx') || f.includes('src/App'));
+let baseHtml = allFiles['index.html'] || allFiles['Crikzone/index.html'] || `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>${appMetadata.name}</title></head>
+<body><div id="root"></div></body>
+</html>`;
+const coreHeadLibs = `
+<script src="https://cdn.tailwindcss.com"><\/script>
+<link rel="stylesheet" href="_bundled/12466kc-all.min.css">
+<script src="_bundled/1hhyiyc-lucide_latest.bin"><\/script>
+<script src="_bundled/1v4gi1k-react.development.js" crossorigin><\/script>
+<script src="_bundled/1oc7f2q-react-dom.development.js" crossorigin><\/script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
+`;
+const admobCfg = getEffectiveAdMobConfig();
+const adMobPreviewScript = `<script>
+window.__ADMOB_CONFIG__ = ${JSON.stringify(admobCfg)};
+window.showBanner = function(){console.log('[AdMob Preview] showBanner called (native bridge only in APK)');return false;};
+window.hideBanner = function(){return false;};
+window.showInterstitial = function(){console.log('[AdMob Preview] showInterstitial called');return false;};
+window.showRewarded = function(){console.log('[AdMob Preview] showRewarded called');return false;};
+window.showNative = function(){return false;};
+window.showAppOpen = function(){return false;};
+window.isAdMobReady = function(){return false;};
+window.onAdRewardEarned = window.onAdRewardEarned || function(a,t){console.log('[AdMob Preview] reward:',a,t);};
+<\/script>`;
+const errorInterceptor = `<script>
+window.onerror = function(msg, url, lineNo, columnNo, error) {
+window.parent.postMessage({ type: 'PREVIEW_ERROR', msg: msg + (error && error.stack ? '\\n' + error.stack : ''), line: lineNo }, '*');
+return false;
+};
+<\/script>`;
+baseHtml = baseHtml.replace('<head>', '<head>' + coreHeadLibs + adMobPreviewScript + errorInterceptor);
+if (isReactProject) {
+let bundledScripts = `<script type="text/babel" data-presets="react,env">
+window.process = { env: { NODE_ENV: 'development' } };
+window.__v_modules = {};
+${Object.keys(allFiles).filter(f => f.endsWith('.css')).map(f => {
+return `const style_${f.replace(/[^a-zA-Z0-9]/g, '_')} = document.createElement('style');
+style_${f.replace(/[^a-zA-Z0-9]/g, '_')}.innerHTML = ${JSON.stringify(allFiles[f])};
+document.head.appendChild(style_${f.replace(/[^a-zA-Z0-9]/g, '_')});`;
+}).join('\n')}
+${Object.keys(allFiles).filter(f => f.endsWith('.json')).map(f => {
+return `window.__v_modules['${f}'] = ${allFiles[f]};`;
+}).join('\n')}
+<\/script>`;
+let jsxFiles = Object.keys(allFiles).filter(f => f.endsWith('.jsx') || f.endsWith('.js') || f.endsWith('.tsx') || f.endsWith('.ts'));
+let bundledJsx = `<script type="text/babel" data-presets="react,env">
+${jsxFiles.map(filePath => {
+let rawCode = allFiles[filePath];
+let transformedCode = rawCode.replace(/import\s+([\s\S]*?)\s+from\s+['"]([^'"]+)['"]/g, (match, imports, source) => {
+let resolved = resolveAliasPath(source, allFiles);
+if (resolved) return `// Resolved ${source}\nconst ${imports.replace(/as\s+/g, ': ')} = window.__v_modules['${resolved}'] || {};`;
+if (source === 'react') return `const ${imports.replace(/as\s+/g, ': ')} = window.React;`;
+if (source === 'react-dom' || source === 'react-dom/client') return `const ${imports.replace(/as\s+/g, ': ')} = window.ReactDOM;`;
+return `const ${imports.replace(/as\s+/g, ': ')} = {};`;
+});
+return `try { (function() { const exports = {}; const module = { exports }; ${transformedCode} window.__v_modules['${filePath}'] = module.exports.default || module.exports || exports; })(); } catch(err) { console.error('Error compiling ${filePath}:', err.message); }`;
+}).join('\n')}
+const mainEntry = window.__v_modules['src/main.jsx'] || window.__v_modules['src/main.js'] || window.__v_modules['src/App.jsx'];
+if (mainEntry && typeof mainEntry === 'function') {
+const rootEl = document.getElementById('root');
+if (rootEl) { const root = ReactDOM.createRoot(rootEl); root.render(React.createElement(mainEntry)); }
+}
+<\/script>`;
+baseHtml = baseHtml.replace('</body>', bundledScripts + bundledJsx + '</body>');
+}
+iframe.srcdoc = baseHtml;
+}
+if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
+logTerminalMessage(`▶ Executing virtual bundle for project (${Object.keys(allFiles).length} files parsed).`);
+}
+
+window.hideDropdownMenu = function() {
+const menu = document.getElementById('mainDropdownMenu');
+const backdrop = document.getElementById('menuBackdrop');
+if (menu) menu.classList.add('hidden');
+if (backdrop) backdrop.classList.add('hidden');
+};
+
+window.toggleMainDrawerMenu = function(event) {
+if (event) event.stopPropagation();
+const menu = document.getElementById('mainDropdownMenu');
+const backdrop = document.getElementById('menuBackdrop');
+if (menu && backdrop) {
+const isHidden = menu.classList.contains('hidden');
+if (isHidden) { menu.classList.remove('hidden'); backdrop.classList.remove('hidden'); }
+else { menu.classList.add('hidden'); backdrop.classList.add('hidden'); }
+}
+};
+
+window.openTerminalDrawer = function() {
+window.hideDropdownMenu();
+const drawer = document.getElementById('terminalDrawer');
+if (drawer) drawer.classList.remove('translate-y-full');
+};
+
+window.toggleTerminalDrawer = function() {
+const drawer = document.getElementById('terminalDrawer');
+if (drawer) drawer.classList.toggle('translate-y-full');
+};
+
+window.logTerminalMessage = function(msg, isErr = false) {
+const output = document.getElementById('terminalOutput');
+if (output) {
+output.innerHTML += `\n<span class="${isErr ? 'text-red-400' : 'text-zinc-300'}">[${new Date().toLocaleTimeString()}] ${msg}</span>`;
+output.scrollTop = output.scrollHeight;
+}
+};
+
+window.toggleExplorerDrawer = function() {
+window.hideDropdownMenu();
+const explorer = document.getElementById('explorerDrawer');
+const backdrop = document.getElementById('drawerBackdrop');
+if (explorer && backdrop) {
+explorer.classList.toggle('-translate-x-full');
+backdrop.classList.toggle('hidden');
+}
+};
+
+window.closeExplorerDrawer = function() {
+const explorer = document.getElementById('explorerDrawer');
+const backdrop = document.getElementById('drawerBackdrop');
+if (explorer) explorer.classList.add('-translate-x-full');
+if (backdrop) backdrop.classList.add('hidden');
+};
+
+function triggerFolderSelect() {
+window.hideDropdownMenu();
+const picker = document.getElementById('folderPicker');
+if (picker) picker.click();
+}
+
+async function handleFolderSelect(event) {
+const files = event.target.files;
+if (!files || files.length === 0) return;
+virtualFileSystem = {};
+let rootFolderName = "";
+for (let i = 0; i < files.length; i++) {
+const file = files[i];
+const relativePath = file.webkitRelativePath;
+if (!relativePath) continue;
+const pathParts = relativePath.split('/');
+if (!rootFolderName) rootFolderName = pathParts[0];
+if (relativePath.includes('/.git/')) continue;
+const content = await file.text();
+const cleanPath = pathParts.slice(1).join('/');
+if (cleanPath) insertIntoVirtualFS(virtualFileSystem, cleanPath.split('/'), content);
+}
+if (rootFolderName) {
+const title = document.getElementById('currentProjectTitle');
+if (title) title.innerHTML = `<i class="fa-solid fa-folder-open text-amber-400 mr-1.5"></i> ${rootFolderName}`;
+appMetadata.name = rootFolderName;
+const displayTitle = document.getElementById('displayAppName');
+if (displayTitle) displayTitle.innerText = rootFolderName;
+}
+syncAppConfigFromSystem();
+saveToLocalStorage();
+renderFileTree();
+const firstHtml = findFirstHTMLFile(virtualFileSystem, "");
+if (firstHtml) openFileFromPath(firstHtml);
+openTerminalDrawer();
+logTerminalMessage(`📁 Successfully imported folder '${rootFolderName}' into Workspace.`);
+}
+
+function insertIntoVirtualFS(fsObj, pathArray, content) {
+let curr = fsObj;
+for (let i = 0; i < pathArray.length; i++) {
+const key = pathArray[i];
+if (i === pathArray.length - 1) curr[key] = content;
+else {
+if (!curr[key] || typeof curr[key] !== 'object') curr[key] = {};
+curr = curr[key];
+}
+}
+}
+
+function findFirstHTMLFile(obj, currentPath) {
+for (const key in obj) {
+const fullPath = currentPath ? `${currentPath}/${key}` : key;
+if (typeof obj[key] === 'string' && (key.endsWith('.html') || key.endsWith('.js'))) return fullPath;
+else if (typeof obj[key] === 'object') {
+const found = findFirstHTMLFile(obj[key], fullPath);
+if (found) return found;
+}
+}
+return null;
+}
+
+function getFileContent(path) {
+const parts = path.split('/');
+let curr = virtualFileSystem;
+for (let p of parts) {
+if (curr[p] !== undefined) curr = curr[p];
+else return "";
+}
+return typeof curr === 'string' ? curr : "";
+}
+
+function saveFileContentLocally(path, content) {
+const parts = path.split('/');
+let curr = virtualFileSystem;
+for (let i = 0; i < parts.length - 1; i++) {
+if (!curr[parts[i]]) curr[parts[i]] = {};
+curr = curr[parts[i]];
+}
+curr[parts[parts.length - 1]] = content;
+if (path === 'app.config.json') syncAppConfigFromSystem();
+saveToLocalStorage();
+}
+
+function onCodeInput() {
+updateLineNumbers();
+const content = document.getElementById('codeEditor').value;
+saveFileContentLocally(activeFile, content);
+hideLineHighlight();
+}
+
+async function manualSaveFile() {
+    const content = document.getElementById('codeEditor').value;
+    saveFileContentLocally(activeFile, content);
+    openTerminalDrawer();
+    logTerminalMessage(`💾 Saving '${activeFile}'...`);
+    let backendOk = false;
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/save`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filePath: activeFile, content: content, appConfig: appMetadata, adMob: getEffectiveAdMobConfig() })
+        });
+        const res = await response.json();
+        if (res.success) { backendOk = true; logTerminalMessage(`✅ Synced to backend: '${activeFile}'`); }
+    } catch (err) {
+        logTerminalMessage(`⚠️ Backend unreachable, saving locally...`, false);
+    }
+    if (!backendOk) {
+        try {
+            const fileName = activeFile.split('/').pop() || 'file.txt';
+            const encoded = btoa(unescape(encodeURIComponent(content)));
+            const dataUrl = 'data:application/octet-stream;base64,' + encoded;
+            const a = document.createElement('a');
+            a.href = dataUrl; a.download = fileName;
+            a.style.cssText = 'position:fixed;left:-9999px;top:-9999px;';
+            document.body.appendChild(a); a.click();
+            setTimeout(() => { try { a.remove(); } catch(e){} }, 2000);
+            logTerminalMessage(`✅ Downloaded '${fileName}' to your device (offline save).`);
+        } catch(e) { logTerminalMessage(`❌ Local save failed: ${e.message}`, true); }
+    }
+    logTerminalMessage(`💾 '${activeFile}' saved in browser storage (persists offline).`);
+}
+
+window.downloadEditorCode = function() {
+    const editor = document.getElementById('codeEditor');
+    if (!editor) return;
+    const fileName = activeFile.split('/').pop() || 'code.txt';
+    const content = editor.value;
+    const sizeKb = (new Blob([content]).size / 1024).toFixed(2);
+    const inIframe = window.self !== window.top;
+    openTerminalDrawer();
+    logTerminalMessage(`⬇️ Preparing '${fileName}' (${sizeKb} KB)...`);
+    const bridges = ['AndroidDownloader','AndroidBridge','NativeBridge','AndroidAppInterface','AppBridge','AndroidFile'];
+    for (const bName of bridges) {
+        const b = window[bName];
+        if (!b) continue;
+        try {
+            if (typeof b.saveFile === 'function') { b.saveFile(fileName, content); logTerminalMessage(`✅ Saved via ${bName}.`); return; }
+            if (typeof b.downloadFile === 'function') { b.downloadFile(fileName, content); logTerminalMessage(`✅ Downloaded via ${bName}.`); return; }
+            if (typeof b.saveFileBase64 === 'function') { b.saveFileBase64(fileName, btoa(unescape(encodeURIComponent(content)))); logTerminalMessage(`✅ Saved via ${bName} (base64).`); return; }
+        } catch(e) {}
+    }
+    let methodUsed = null;
+    try {
+        const encoded = btoa(unescape(encodeURIComponent(content)));
+        const dataUrl = 'data:application/octet-stream;base64,' + encoded;
+        const a = document.createElement('a');
+        a.href = dataUrl; a.download = fileName;
+        a.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;';
+        document.body.appendChild(a); a.click();
+        setTimeout(() => { try { a.remove(); } catch(e){} }, 3000);
+        methodUsed = 'dataurl';
+        logTerminalMessage(`✅ Data URL download triggered.`);
+    } catch(e) { logTerminalMessage(`⚠️ Data URL failed: ${e.message}`, true); }
+    if (!methodUsed) {
+        try {
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = fileName;
+            a.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;';
+            document.body.appendChild(a); a.click();
+            setTimeout(() => { try { a.remove(); } catch(e){} try { URL.revokeObjectURL(url); } catch(e){} }, 15000);
+            methodUsed = 'blob';
+            logTerminalMessage(`✅ Blob download triggered.`);
+        } catch(e) { logTerminalMessage(`❌ Blob failed: ${e.message}`, true); }
+    }
+    const showDelay = inIframe ? 300 : 2000;
+    setTimeout(() => {
+        if (!document.getElementById('downloadManualModal')) {
+            showManualSaveModal(fileName, content, sizeKb, methodUsed, inIframe);
+        }
+    }, showDelay);
+};
+
+function showManualSaveModal(fileName, content, sizeKb, methodUsed, inIframe) {
+    const safeContent = content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const modal = document.createElement('div');
+    modal.id = 'downloadManualModal';
+    modal.className = 'fixed inset-0 bg-black/85 backdrop-blur-sm z-[60] flex items-center justify-center p-3';
+    modal.innerHTML = `
+        <div class="bg-[#18181b] border border-zinc-700 rounded-2xl w-full max-w-md shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
+            <div class="px-4 py-3 bg-[#1f1f23] border-b border-zinc-800 flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-cyan-600/20 border border-cyan-500/30 text-cyan-400 border flex items-center justify-center">
+                        <i class="fa-solid fa-download text-sm"></i>
+                    </div>
+                    <div>
+                        <div class="text-sm font-bold text-zinc-100">Get Your Code</div>
+                        <div class="text-[10px] text-cyan-400">${fileName} • ${sizeKb} KB</div>
+                    </div>
+                </div>
+                <button id="dlCloseBtn" class="text-zinc-400 hover:text-white p-1.5 rounded-lg hover:bg-zinc-800">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+            <div class="p-3 space-y-2.5 overflow-y-auto flex-1">
+                <div class="bg-blue-900/25 border border-blue-700/40 rounded-lg p-2.5 text-[10px] text-blue-200 leading-relaxed">
+                    <b>💡 Tip:</b> Agar download nahi hua, to <b>Copy Code</b> sabse pehle try karein — 100% reliable hai. Ya <b>Save As</b> / <b>Share</b> use karein.
+                </div>
+                <button id="dlCopyBtn" class="w-full px-4 py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-lg shadow-blue-600/30">
+                    <i class="fa-solid fa-copy text-base"></i> Copy Code to Clipboard
+                </button>
+                <div class="flex gap-2">
+                    <button id="dlSaveAsBtn" class="flex-1 px-3 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors">
+                        <i class="fa-solid fa-file-arrow-down"></i> Save As
+                    </button>
+                    <button id="dlShareBtn" class="flex-1 px-3 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors">
+                        <i class="fa-solid fa-share-nodes"></i> Share
+                    </button>
+                </div>
+                <button id="dlRetryBtn" class="w-full px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors">
+                    <i class="fa-solid fa-redo"></i> Retry Auto Download
+                </button>
+                <details class="bg-[#0f0f11] border border-zinc-800 rounded-lg overflow-hidden">
+                    <summary class="px-2.5 py-2 text-[10px] text-zinc-400 cursor-pointer hover:text-zinc-200">👁️ View Code Preview</summary>
+                    <textarea id="dlManualText" readonly class="w-full h-32 bg-[#0f0f11] border-t border-zinc-800 p-2 text-[10px] code-font text-zinc-300 outline-none resize-none" onclick="this.select()">${safeContent}</textarea>
+                </details>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+    document.getElementById('dlCloseBtn').onclick = () => modal.remove();
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    document.getElementById('dlCopyBtn').onclick = async (e) => {
+        const btn = e.currentTarget;
+        let copied = false;
+        try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(content); copied = true; } } catch(err) {}
+        if (!copied) {
+            try {
+                const ta = document.getElementById('dlManualText');
+                ta.removeAttribute('readonly'); ta.focus(); ta.select(); ta.setSelectionRange(0, content.length);
+                copied = document.execCommand('copy'); ta.setAttribute('readonly', 'readonly');
+            } catch(err) {}
+        }
+        if (copied) {
+            btn.innerHTML = '<i class="fa-solid fa-check text-base"></i> Copied! Ab apne editor me paste karein';
+            btn.classList.remove('bg-blue-600','hover:bg-blue-500','shadow-blue-600/30');
+            btn.classList.add('bg-emerald-600');
+            logTerminalMessage(`✅ '${fileName}' copied. Paste in Notepad/VS Code/any editor.`);
+            setTimeout(() => {
+                btn.innerHTML = '<i class="fa-solid fa-copy text-base"></i> Copy Code to Clipboard';
+                btn.classList.remove('bg-emerald-600');
+                btn.classList.add('bg-blue-600','hover:bg-blue-500','shadow-blue-600/30');
+            }, 4000);
+        } else { alert('Copy failed. Long-press the code preview below and copy manually.'); }
+    };
+    document.getElementById('dlSaveAsBtn').onclick = async () => {
+        if (window.showSaveFilePicker) {
+            try {
+                const handle = await window.showSaveFilePicker({ suggestedName: fileName, types: [{ description: 'Code file', accept: { 'text/plain': ['.html','.htm','.css','.js','.jsx','.json','.txt','.xml','.svg'] } }] });
+                const writable = await handle.createWritable(); await writable.write(content); await writable.close();
+                logTerminalMessage(`✅ Saved '${fileName}' via file picker.`); modal.remove(); return;
+            } catch(e) { if (e.name === 'AbortError') return; }
+        }
+        const newName = prompt('Save file as (with extension):', fileName);
+        if (!newName || !newName.trim()) return;
+        try {
+            const encoded = btoa(unescape(encodeURIComponent(content)));
+            const dataUrl = 'data:application/octet-stream;base64,' + encoded;
+            const a = document.createElement('a');
+            a.href = dataUrl; a.download = newName.trim();
+            a.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;';
+            document.body.appendChild(a); a.click();
+            setTimeout(() => { try { a.remove(); } catch(e){} }, 3000);
+            logTerminalMessage(`✅ Saving as '${newName.trim()}'...`);
+        } catch(e) { logTerminalMessage(`❌ Save As failed: ${e.message}`, true); }
+    };
+    document.getElementById('dlShareBtn').onclick = async () => {
+        if (!navigator.share) { alert('Share is not supported on this device/browser.'); return; }
+        try {
+            if (typeof File !== 'undefined' && navigator.canShare) {
+                const file = new File([content], fileName, { type: 'text/plain' });
+                if (navigator.canShare({ files: [file] })) {
+                    await navigator.share({ files: [file], title: fileName, text: `Code file: ${fileName}` });
+                    logTerminalMessage(`✅ Shared file '${fileName}' via system sheet.`); return;
+                }
+            }
+            await navigator.share({ title: fileName, text: content });
+            logTerminalMessage(`✅ Shared code as text via system sheet.`);
+        } catch(e) { if (e.name === 'AbortError') return; logTerminalMessage(`⚠️ Share cancelled/failed: ${e.message}`, true); }
+    };
+    document.getElementById('dlRetryBtn').onclick = () => {
+        try {
+            const encoded = btoa(unescape(encodeURIComponent(content)));
+            const dataUrl = 'data:application/octet-stream;base64,' + encoded;
+            const a = document.createElement('a');
+            a.href = dataUrl; a.download = fileName;
+            a.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;';
+            document.body.appendChild(a); a.click();
+            setTimeout(() => { try { a.remove(); } catch(e){} }, 3000);
+            logTerminalMessage(`🔁 Retry: '${fileName}'...`);
+        } catch(e) { logTerminalMessage(`❌ Retry failed: ${e.message}`, true); }
+    };
+}
+
+function updateLineNumbers() {
+const editor = document.getElementById('codeEditor');
+const lineNumbers = document.getElementById('lineNumbers');
+if (!editor || !lineNumbers) return;
+const lines = editor.value.split('\n').length;
+let nums = '';
+for (let i = 1; i <= lines; i++) nums += i + '<br>';
+lineNumbers.innerHTML = nums;
+}
+
+function openFileFromPath(path) {
+if (path === "app.config.json") { openAppConfigModal(); return; }
+if (path === "admob.config.json") { openAdMobModal(); return; }
+activeFile = path;
+const fileNameEl = document.getElementById('activeFileName');
+const editor = document.getElementById('codeEditor');
+if (fileNameEl) fileNameEl.innerText = path;
+if (editor) editor.value = getFileContent(path);
+updateLineNumbers();
+renderFileTree();
+closeExplorerDrawer();
+const aiCtx = document.getElementById('aiContextFile');
+if (aiCtx) aiCtx.innerText = path;
+hideLineHighlight();
+saveToLocalStorage();
+}
+
+function syncEditorScroll() {
+const editor = document.getElementById('codeEditor');
+const lines = document.getElementById('lineNumbers');
+if (editor && lines) lines.scrollTop = editor.scrollTop;
+repositionLineHighlight();
+}
+
+function renderFileTree() {
+const container = document.getElementById('fileTreeContainer');
+if (container) container.innerHTML = generateTreeHTML(virtualFileSystem, "");
+}
+
+function generateTreeHTML(obj, currentPath) {
+let html = '';
+for (const key in obj) {
+const fullPath = currentPath ? `${currentPath}/${key}` : key;
+if (typeof obj[key] === 'object') {
+html += `
+<div class="select-none">
+<div class="flex items-center justify-between group px-2.5 py-1.5 hover:bg-zinc-800 rounded-lg cursor-pointer text-zinc-300">
+<div class="flex items-center gap-1.5 truncate">
+<i class="fa-solid fa-angle-down text-zinc-400 text-[10px] w-3"></i>
+<i class="fa-solid fa-folder text-amber-400"></i>
+<span class="font-medium truncate">${key}</span>
+</div>
+<button onclick="deletePath('${fullPath}', event)" class="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 p-1 transition-opacity" title="Delete Folder">
+<i class="fa-solid fa-trash text-[10px]"></i>
+</button>
+</div>
+<div class="pl-4 space-y-0.5">${generateTreeHTML(obj[key], fullPath)}</div>
+</div>`;
+} else {
+const isActive = activeFile === fullPath;
+const activeClass = isActive ? 'bg-emerald-600/20 text-emerald-400 font-semibold border border-emerald-500/30' : 'text-zinc-300 hover:bg-zinc-800/60';
+let icon = 'fa-solid fa-file-code text-zinc-400';
+if (key.endsWith('.html')) icon = 'fa-brands fa-html5 text-orange-400';
+if (key.endsWith('.css')) icon = 'fa-brands fa-css3-alt text-blue-400';
+if (key.endsWith('.js')) icon = 'fa-brands fa-square-js text-yellow-400';
+if (key.endsWith('.json')) icon = 'fa-solid fa-gear text-blue-400';
+html += `
+<div onclick="openFileFromPath('${fullPath}')" class="flex items-center justify-between group px-2.5 py-1.5 rounded-lg cursor-pointer ${activeClass} transition-colors">
+<div class="flex items-center gap-2 truncate">
+<i class="${icon}"></i>
+<span class="truncate">${key}</span>
+</div>
+<button onclick="deletePath('${fullPath}', event)" class="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 p-1 transition-opacity" title="Delete File">
+<i class="fa-solid fa-trash text-[10px]"></i>
+</button>
+</div>`;
+}
+}
+return html;
+}
+
+function createNewFolder() {
+const folderName = prompt("Enter new folder name (e.g. assets, components):");
+if (folderName) {
+if (!virtualFileSystem[folderName]) {
+virtualFileSystem[folderName] = {};
+saveToLocalStorage();
+renderFileTree();
+logTerminalMessage(`📁 Created folder: ${folderName}`);
+} else { alert("Folder already exists!"); }
+}
+}
+
+function deletePath(path, e) {
+if (e) e.stopPropagation();
+if (confirm(`Are you sure you want to delete ${path}?`)) {
+const parts = path.split('/');
+let curr = virtualFileSystem;
+for (let i = 0; i < parts.length - 1; i++) curr = curr[parts[i]];
+delete curr[parts[parts.length - 1]];
+saveToLocalStorage();
+renderFileTree();
+logTerminalMessage(`🗑️ Deleted: ${path}`);
+}
+}
+
+function clearTerminal() {
+const output = document.getElementById('terminalOutput');
+if (output) output.innerText = 'Terminal logs cleared.';
+}
+
+/* =========================================================
+   OFFLINE BUNDLER ENGINE
+   Downloads external CDN resources into virtualFileSystem._bundled/
+   and rewrites refs. Runs BEFORE the ZIP is created.
+   ========================================================= */
+const OFFLINE_BUNDLER = {
+    MAX_FILE_BYTES: 2 * 1024 * 1024,
+    MAX_TOTAL_BYTES: 30 * 1024 * 1024,
+    warnings: [],
+    bytesDownloaded: 0,
+    filesBundled: 0,
+    alreadyBundled: 0,
+    urlToLocalPath: new Map(),
+    inFlight: new Map()
+};
+
+function _bundleLog(msg, isErr) { logTerminalMessage(msg, isErr); }
+function _isAbsoluteUrl(u) { return typeof u === 'string' && /^https?:\/\//i.test(u); }
+function _extFromUrl(u, hint) {
+    try {
+        const clean = u.split('#')[0].split('?')[0];
+        const m = clean.match(/\.([a-zA-Z0-9]{1,8})$/);
+        if (m) return '.' + m[1].toLowerCase();
+    } catch (e) {}
+    return hint || '.bin';
+}
+function _sanitizeName(u) {
+    try {
+        const clean = u.split('#')[0].split('?')[0];
+        const parts = clean.split('/');
+        let base = parts[parts.length - 1] || 'resource';
+        base = base.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
+        return base || 'resource';
+    } catch (e) { return 'resource'; }
+}
+function _hashString(s) {
+    let h = 5381;
+    for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+    return (h >>> 0).toString(36);
+}
+function _ensureBundledFolder() {
+    if (!virtualFileSystem._bundled || typeof virtualFileSystem._bundled !== 'object') {
+        virtualFileSystem._bundled = {};
+    }
+}
+function _writeBundledFile(relPath, content) {
+    _ensureBundledFolder();
+    const parts = relPath.split('/');
+    let curr = virtualFileSystem;
+    for (let i = 0; i < parts.length - 1; i++) {
+        if (!curr[parts[i]] || typeof curr[parts[i]] !== 'object') curr[parts[i]] = {};
+        curr = curr[parts[i]];
+    }
+    curr[parts[parts.length - 1]] = content;
+}
+function _hasBundledFile(relPath) {
+    const parts = relPath.split('/');
+    let curr = virtualFileSystem;
+    for (const p of parts) {
+        if (!curr || typeof curr !== 'object' || curr[p] === undefined) return false;
+        curr = curr[p];
+    }
+    return typeof curr === 'string';
+}
+
+async function _downloadExternalUrl(url) {
+    if (OFFLINE_BUNDLER.urlToLocalPath.has(url)) {
+        const existing = OFFLINE_BUNDLER.urlToLocalPath.get(url);
+        if (_hasBundledFile(existing)) {
+            OFFLINE_BUNDLER.alreadyBundled++;
+            return { localPath: existing, cached: true };
+        }
+    }
+    if (OFFLINE_BUNDLER.inFlight.has(url)) return OFFLINE_BUNDLER.inFlight.get(url);
+
+    const promise = (async () => {
+        try {
+            const resp = await fetch(url, { method: 'GET', mode: 'cors', credentials: 'omit' });
+            if (!resp.ok) return { error: `HTTP ${resp.status} for ${url}` };
+            const contentType = (resp.headers.get('content-type') || '').toLowerCase();
+            const isLikelyBinary = /font\/|image\/|octet-stream/.test(contentType) ||
+                /\.(woff2?|ttf|otf|eot|png|jpe?g|gif|webp|ico|svg)$/i.test(url);
+            const ext = _extFromUrl(url, isLikelyBinary ? '' : '');
+            const base = _sanitizeName(url);
+            const hash = _hashString(url);
+            const filename = `${hash}-${base}`.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 100);
+            const localPath = `_bundled/${filename}${ext && !filename.endsWith(ext) ? ext : ''}`;
+            let content; let bytes = 0;
+            if (isLikelyBinary) {
+                const buf = await resp.arrayBuffer();
+                bytes = buf.byteLength;
+                if (bytes > OFFLINE_BUNDLER.MAX_FILE_BYTES) return { error: `File too large (${bytes} bytes) for ${url}` };
+                content = _arrayBufferToBase64(buf);
+            } else {
+                const text = await resp.text();
+                bytes = text.length;
+                if (bytes > OFFLINE_BUNDLER.MAX_FILE_BYTES) return { error: `File too large (${bytes} bytes) for ${url}` };
+                content = text;
+            }
+            if (OFFLINE_BUNDLER.bytesDownloaded + bytes > OFFLINE_BUNDLER.MAX_TOTAL_BYTES) {
+                return { error: `Total size cap exceeded — skipping ${url}` };
+            }
+            OFFLINE_BUNDLER.bytesDownloaded += bytes;
+            _writeBundledFile(localPath, content);
+            OFFLINE_BUNDLER.urlToLocalPath.set(url, localPath);
+            OFFLINE_BUNDLER.filesBundled++;
+            return { localPath, content, isBinary: isLikelyBinary };
+        } catch (e) {
+            return { error: `Download failed (${e.message}) for ${url}` };
+        }
+    })();
+    OFFLINE_BUNDLER.inFlight.set(url, promise);
+    try { return await promise; }
+    finally { OFFLINE_BUNDLER.inFlight.delete(url); }
+}
+function _arrayBufferToBase64(buffer) {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    }
+    return btoa(binary);
+}
+function _resolveCssUrl(baseUrl, target) {
+    if (!target) return '';
+    if (/^https?:\/\//i.test(target)) return target;
+    if (target.startsWith('data:') || target.startsWith('#')) return target;
+    try { return new URL(target, baseUrl).toString(); } catch (e) { return target; }
+}
+function _extractCssDependencies(css, baseUrl) {
+    const deps = [];
+    const importRe = /@import\s+(?:url\(\s*['"]?([^'")]+)['"]?\s*\)|['"]([^'"]+)['"])\s*;?/gi;
+    let m;
+    while ((m = importRe.exec(css)) !== null) {
+        const target = m[1] || m[2];
+        if (target) {
+            const abs = _resolveCssUrl(baseUrl, target.trim());
+            if (_isAbsoluteUrl(abs)) deps.push({ kind: 'import', url: abs, raw: m[0] });
+        }
+    }
+    const urlRe = /url\(\s*['"]?([^'")]+)['"]?\s*\)/gi;
+    while ((m = urlRe.exec(css)) !== null) {
+        const target = m[1];
+        if (!target) continue;
+        const abs = _resolveCssUrl(baseUrl, target.trim());
+        if (_isAbsoluteUrl(abs) && !/^data:/i.test(abs)) deps.push({ kind: 'url', url: abs, raw: m[0] });
+    }
+    return deps;
+}
+async function _rewriteCssReferences(css, baseUrl) {
+    const deps = _extractCssDependencies(css, baseUrl);
+    let out = css;
+    const seen = new Set();
+    for (const d of deps) {
+        if (seen.has(d.url)) continue;
+        seen.add(d.url);
+        const res = await _downloadExternalUrl(d.url);
+        if (res.error) { OFFLINE_BUNDLER.warnings.push(d.url + ' — ' + res.error); continue; }
+        const localRel = res.localPath.startsWith('_bundled/') ? res.localPath.slice('_bundled/'.length) : res.localPath;
+        if (d.kind === 'import' && !res.isBinary && res.content) {
+            const rewritten = await _rewriteCssReferences(res.content, d.url);
+            _writeBundledFile(res.localPath, rewritten);
+        }
+        if (d.kind === 'url') out = out.split(d.raw).join(`url("${localRel}")`);
+        else if (d.kind === 'import') out = out.split(d.raw).join(`@import "${localRel}";`);
+    }
+    return out;
+}
+function _extractHtmlExternalRefs(html) {
+    const refs = [];
+    const linkRe = /<link\b[^>]*\bhref\s*=\s*(['"])(https?:\/\/[^'"]+)\1[^>]*>/gi;
+    let m;
+    while ((m = linkRe.exec(html)) !== null) refs.push({ kind: 'link', url: m[2].trim(), raw: m[0] });
+    const scriptRe = /<script\b[^>]*\bsrc\s*=\s*(['"])(https?:\/\/[^'"]+)\1[^>]*>[\s\S]*?<\/script>/gi;
+    while ((m = scriptRe.exec(html)) !== null) refs.push({ kind: 'script', url: m[2].trim(), raw: m[0] });
+    const scriptRe2 = /<script\b[^>]*\bsrc\s*=\s*(['"])(https?:\/\/[^'"]+)\1[^>]*\/?>/gi;
+    while ((m = scriptRe2.exec(html)) !== null) {
+        if (!refs.some(r => r.url === m[2].trim() && r.kind === 'script')) refs.push({ kind: 'script-self', url: m[2].trim(), raw: m[0] });
+    }
+    const imgRe = /<img\b[^>]*\bsrc\s*=\s*(['"])(https?:\/\/[^'"]+)\1[^>]*>/gi;
+    while ((m = imgRe.exec(html)) !== null) refs.push({ kind: 'img', url: m[2].trim(), raw: m[0] });
+    const inlineStyleRe = /style\s*=\s*(['"])([^'"]*url\([^'"]*https?:\/\/[^'"]*)\1/gi;
+    while ((m = inlineStyleRe.exec(html)) !== null) refs.push({ kind: 'inline-style', url: null, raw: m[0], attrValue: m[2] });
+    return refs;
+}
+async function _rewriteHtmlReferences(html) {
+    const refs = _extractHtmlExternalRefs(html);
+    let out = html;
+    for (const r of refs) {
+        if (!r.url && r.kind !== 'inline-style') continue;
+        if (r.kind === 'inline-style') {
+            const deps = _extractCssDependencies(r.attrValue, document.baseURI);
+            let newAttr = r.attrValue;
+            for (const d of deps) {
+                const res = await _downloadExternalUrl(d.url);
+                if (res.error) { OFFLINE_BUNDLER.warnings.push(d.url + ' — ' + res.error); continue; }
+                const localRel = res.localPath.startsWith('_bundled/') ? res.localPath.slice('_bundled/'.length) : res.localPath;
+                newAttr = newAttr.split(d.raw).join(`url("${localRel}")`);
+            }
+            out = out.split(r.raw).join(r.raw.replace(r.attrValue, newAttr));
+            continue;
+        }
+        const res = await _downloadExternalUrl(r.url);
+        if (res.error) { OFFLINE_BUNDLER.warnings.push(r.url + ' — ' + res.error); continue; }
+        if (!res.isBinary && res.content && /\.css(\?|#|$)/i.test(r.url)) {
+            const rewrittenCss = await _rewriteCssReferences(res.content, r.url);
+            _writeBundledFile(res.localPath, rewrittenCss);
+        }
+        out = out.split(r.raw).join(r.raw.replace(r.url, res.localPath));
+    }
+    return out;
+}
+async function _rewriteJsModuleImports(js) {
+    const importRe = /(\bimport\s+(?:[^'"]+?\s+from\s+)?['"])(https?:\/\/[^'"]+)(['"])/g;
+    let out = js; let m; const matches = [];
+    while ((m = importRe.exec(js)) !== null) matches.push({ raw: m[0], url: m[2] });
+    for (const item of matches) {
+        const res = await _downloadExternalUrl(item.url);
+        if (res.error) { OFFLINE_BUNDLER.warnings.push(item.url + ' — ' + res.error); continue; }
+        out = out.split(item.raw).join(item.raw.replace(item.url, res.localPath));
+    }
+    return out;
+}
+function _flattenAllPaths(obj, prefix = '') {
+    const result = [];
+    for (const key in obj) {
+        if (key === '_bundled') continue;
+        const path = prefix ? `${prefix}/${key}` : key;
+        if (typeof obj[key] === 'object' && obj[key] !== null) {
+            result.push(..._flattenAllPaths(obj[key], path));
+        } else if (typeof obj[key] === 'string') {
+            result.push(path);
+        }
+    }
+    return result;
+}
+
+async function bundleAllExternalResourcesForOffline(fs) {
+    OFFLINE_BUNDLER.warnings = [];
+    OFFLINE_BUNDLER.bytesDownloaded = 0;
+    OFFLINE_BUNDLER.filesBundled = 0;
+    OFFLINE_BUNDLER.alreadyBundled = 0;
+    OFFLINE_BUNDLER.urlToLocalPath.clear();
+    OFFLINE_BUNDLER.inFlight.clear();
+    _ensureBundledFolder();
+
+    const allPaths = _flattenAllPaths(fs);
+    const htmlFiles = allPaths.filter(p => /\.html?$/i.test(p));
+    const cssFiles = allPaths.filter(p => /\.css$/i.test(p));
+    const jsFiles = allPaths.filter(p => /\.m?js$/i.test(p));
+
+    _bundleLog(`📦 Offline bundler: scanning ${htmlFiles.length} HTML, ${cssFiles.length} CSS, ${jsFiles.length} JS files...`);
+
+    for (const p of htmlFiles) {
+        const parts = p.split('/'); let curr = fs;
+        for (let i = 0; i < parts.length - 1; i++) curr = curr[parts[i]];
+        const key = parts[parts.length - 1];
+        try {
+            const newHtml = await _rewriteHtmlReferences(curr[key]);
+            if (newHtml !== curr[key]) { curr[key] = newHtml; _bundleLog(`  ✓ Rewrote external refs in ${p}`); }
+        } catch (e) { OFFLINE_BUNDLER.warnings.push(`${p} — rewrite failed: ${e.message}`); }
+    }
+    for (const p of cssFiles) {
+        const parts = p.split('/'); let curr = fs;
+        for (let i = 0; i < parts.length - 1; i++) curr = curr[parts[i]];
+        const key = parts[parts.length - 1];
+        try {
+            const newCss = await _rewriteCssReferences(curr[key], document.baseURI);
+            if (newCss !== curr[key]) { curr[key] = newCss; _bundleLog(`  ✓ Rewrote external refs in ${p}`); }
+        } catch (e) { OFFLINE_BUNDLER.warnings.push(`${p} — rewrite failed: ${e.message}`); }
+    }
+    for (const p of jsFiles) {
+        const parts = p.split('/'); let curr = fs;
+        for (let i = 0; i < parts.length - 1; i++) curr = curr[parts[i]];
+        const key = parts[parts.length - 1];
+        try {
+            const newJs = await _rewriteJsModuleImports(curr[key]);
+            if (newJs !== curr[key]) { curr[key] = newJs; _bundleLog(`  ✓ Rewrote ES module imports in ${p}`); }
+        } catch (e) { OFFLINE_BUNDLER.warnings.push(`${p} — JS rewrite failed: ${e.message}`); }
+    }
+
+    try {
+        const manifest = {
+            generatedAt: new Date().toISOString(),
+            filesBundled: OFFLINE_BUNDLER.filesBundled,
+            alreadyBundled: OFFLINE_BUNDLER.alreadyBundled,
+            bytesDownloaded: OFFLINE_BUNDLER.bytesDownloaded,
+            warnings: OFFLINE_BUNDLER.warnings,
+            resources: Array.from(OFFLINE_BUNDLER.urlToLocalPath.entries()).map(([url, local]) => ({ url, local }))
+        };
+        _writeBundledFile('_bundled/_manifest.json', JSON.stringify(manifest, null, 2));
+    } catch (e) {}
+
+    _bundleLog(`📦 Bundler: ${OFFLINE_BUNDLER.filesBundled} new files, ${OFFLINE_BUNDLER.alreadyBundled} reused, ${(OFFLINE_BUNDLER.bytesDownloaded / 1024).toFixed(1)} KB downloaded.`);
+    if (OFFLINE_BUNDLER.warnings.length > 0) {
+        _bundleLog(`⚠️ ${OFFLINE_BUNDLER.warnings.length} dependency warning(s) — see below:`, true);
+        OFFLINE_BUNDLER.warnings.slice(0, 20).forEach(w => _bundleLog(`   • ${w}`, true));
+    } else {
+        _bundleLog(`✅ All external dependencies bundled successfully.`);
+    }
+    return { ok: true, ...OFFLINE_BUNDLER };
+}
+
+/* =========================================================
+   Build ZIP blob from virtualFileSystem
+   ========================================================= */
+async function buildProjectZipBlob() {
+    if (typeof JSZip === 'undefined') {
+        throw new Error('JSZip library not loaded — check internet connection or script tag.');
+    }
+    const zip = new JSZip();
+    const allFiles = flattenVirtualFiles(virtualFileSystem);
+    for (const [relPath, content] of Object.entries(allFiles)) {
+        if (relPath === '_bundled/_manifest.json') continue;
+        if (relPath.startsWith('_bundled/') && /\.(woff2?|ttf|otf|eot|png|jpe?g|gif|webp|ico)$/i.test(relPath)) {
+            try {
+                zip.file(relPath, content, { base64: true });
+            } catch (e) {
+                zip.file(relPath, content);
+            }
+        } else {
+            zip.file(relPath, content);
+        }
+    }
+    try {
+        zip.file('_app_meta.json', JSON.stringify({
+            appName: appMetadata.name,
+            packageName: appMetadata.packageName,
+            version: appMetadata.version,
+            hasIcon: !!appMetadata.iconDataUrl,
+            adMob: getEffectiveAdMobConfig(),
+            generatedAt: new Date().toISOString()
+        }, null, 2));
+    } catch (e) {}
+    return await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+}
+
+/* =========================================================
+   R2 UPLOAD HELPERS — signed-headers aware, XHR with progress
+   ========================================================= */
+function getSignedHeadersFromUrl(url) {
+    try {
+        const u = new URL(url);
+        const signed = u.searchParams.get('X-Amz-SignedHeaders');
+        if (!signed) return [];
+        return signed.split(';').map(s => s.trim().toLowerCase()).filter(Boolean);
+    } catch (e) {
+        return [];
+    }
+}
+
+function r2ShowProgress() {
+    const wrap = document.getElementById('r2UploadProgressWrap');
+    if (wrap) wrap.classList.remove('hidden');
+    r2UpdateProgress(0, 0, 0);
+}
+function r2UpdateProgress(pct, loaded, total) {
+    const bar = document.getElementById('r2UploadProgressBar');
+    const lbl = document.getElementById('r2UploadProgressLabel');
+    const pc = document.getElementById('r2UploadProgressPercent');
+    if (bar) bar.style.width = Math.max(0, Math.min(100, pct)) + '%';
+    if (pc) pc.textContent = Math.max(0, Math.min(100, Math.round(pct))) + '%';
+    if (lbl) {
+        if (total > 0) {
+            const mb = (loaded / 1024 / 1024).toFixed(2);
+            const tot = (total / 1024 / 1024).toFixed(2);
+            lbl.textContent = `Uploading to R2… ${mb} / ${tot} MB`;
+        } else {
+            lbl.textContent = 'Uploading to R2…';
+        }
+    }
+}
+function r2HideProgress() {
+    setTimeout(() => {
+        const wrap = document.getElementById('r2UploadProgressWrap');
+        if (wrap) wrap.classList.add('hidden');
+        r2UpdateProgress(0, 0, 0);
+    }, 1800);
+}
+
+/* XHR uploader — respects signed headers strictly */
+function _uploadZipToR2(uploadUrl, blob, onProgress) {
+    return new Promise((resolve, reject) => {
+        const signed = getSignedHeadersFromUrl(uploadUrl);
+        const hasContentType = signed.includes('content-type');
+
+        // If content-type is NOT signed, strip MIME so browser doesn't auto-add it
+        let bodyToSend = blob;
+        if (!hasContentType && typeof blob.slice === 'function') {
+            try { bodyToSend = blob.slice(0, blob.size, ''); } catch(e) { bodyToSend = blob; }
+        }
+
+        const xhr = new XMLHttpRequest();
+        try {
+            xhr.open('PUT', uploadUrl, true);
+        } catch (e) {
+            reject({ status: 0, code: 'OPEN_FAILED', message: e.message || 'XHR open failed' });
+            return;
+        }
+        xhr.withCredentials = false;                 // NO cookies / credentials
+        xhr.timeout = 10 * 60 * 1000;                 // 10 min hard cap
+        xhr.responseType = 'text';
+
+        // Send ONLY headers explicitly signed by presigned URL
+        if (hasContentType) {
+            try { xhr.setRequestHeader('Content-Type', 'application/zip'); } catch(e) {}
+        }
+        // Never manually send Authorization / x-amz-* — they're in query string
+
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable && typeof onProgress === 'function') {
+                const pct = (e.loaded / e.total) * 100;
+                try { onProgress(e.loaded, e.total, pct); } catch(err) {}
+            }
+        };
+
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                const etag = xhr.getResponseHeader('ETag') || '';
+                resolve({ status: xhr.status, etag });
+            } else {
+                let code = '', msg = '';
+                try {
+                    const t = String(xhr.responseText || '');
+                    const m1 = t.match(/<Code>([^<]+)<\/Code>/);
+                    if (m1) code = m1[1];
+                    const m2 = t.match(/<Message>([^<]+)<\/Message>/);
+                    if (m2) msg = m2[1];
+                } catch (e) {}
+                reject({ status: xhr.status, code, message: msg, responseText: xhr.responseText || '' });
+            }
+        };
+
+        xhr.onerror = (event) => {
+            let uploadHost = 'unknown';
+            try { uploadHost = new URL(uploadUrl).host; } catch (e) {}
+            const pageOrigin = (typeof window !== 'undefined' && window.location)
+                ? window.location.origin
+                : 'unknown';
+            try {
+                console.error('[R2 UPLOAD NETWORK ERROR]', {
+                    eventType: event && event.type ? event.type : 'error',
+                    uploadHost,
+                    pageOrigin,
+                    signedHeaders: signed,
+                    withCredentials: xhr.withCredentials,
+                    readyState: xhr.readyState,
+                    status: xhr.status
+                });
+            } catch (e) {}
+            reject({
+                status: 0,
+                code: 'NETWORK_OR_CORS',
+                message: `Network/CORS failure; host=${uploadHost}; origin=${pageOrigin}`
+            });
+        };
+        xhr.ontimeout = () => {
+            reject({ status: 0, code: 'TIMEOUT', message: 'Upload timed out (10 min)' });
+        };
+        xhr.onabort = () => {
+            reject({ status: 0, code: 'ABORTED', message: 'Upload aborted' });
+        };
+
+        try { xhr.send(bodyToSend); }
+        catch (e) { reject({ status: 0, code: 'SEND_FAILED', message: e.message || 'XHR send failed' }); }
+    });
+}
+
+/* Classify R2 error into a user-readable message */
+function _classifyR2Error(err) {
+    if (!err) return '❓ Unknown R2 upload error.';
+    if (err.status === 0) {
+        if (err.code === 'TIMEOUT') return '⏱️ Upload timeout (10 min). Slow network ya bahut bara file. Retry karein.';
+        if (err.code === 'ABORTED') return '⏹️ Upload cancel ho gaya.';
+        if (err.code === 'OPEN_FAILED' || err.code === 'SEND_FAILED') return `🔧 XHR error: ${err.message}`;
+        return '🌐 Network/CORS failure (HTTP 0). R2 CORS policy check karein: AllowedMethods=["GET","PUT","POST","HEAD"], AllowedHeaders=["*"], AllowedOrigins=["*"]. Browser console → Network tab kholen — "CORS policy" error dikhega.';
+    }
+    if (err.status === 403) {
+        if (err.code === 'SignatureDoesNotMatch') return '🔐 SignatureDoesNotMatch — signed Content-Type aur upload Content-Type match nahi kar rahe. Backend `PutObjectCommand` me `ContentType: "application/zip"` set karein, ya frontend me Content-Type hata dein.';
+        if (err.code === 'AccessDenied') return '🚫 AccessDenied — presigned URL galat, expired, ya bucket policy block kar rahi hai.';
+        if (err.code === 'ExpiredToken' || err.code === 'InvalidAccessKeyId') return '⏳ Presigned URL expire ho gaya. Naya build trigger karein.';
+        if (err.code === 'RequestTimeTooSkewed') return '🕒 Aapke device ka clock galat hai. Time sync karein aur retry karein.';
+        return `🔐 403 Forbidden — ${err.code || 'Signature/policy issue'}${err.message ? ' — ' + err.message : ''}`;
+    }
+    if (err.status === 400) {
+        if (err.code === 'InvalidRequest') return `❌ 400 InvalidRequest — ${err.message || 'Malformed upload request'}`;
+        return `❌ 400 Bad Request — ${err.code || ''}${err.message ? ' — ' + err.message : ''}`;
+    }
+    if (err.status === 404) return '❌ 404 — Bucket ya key exist nahi karta. Backend response check karein.';
+    if (err.status === 413) return '📦 413 Payload Too Large — ZIP size R2 limit se zyada.';
+    if (err.status >= 500) return `💥 R2 server error (HTTP ${err.status}) — Retry karein.`;
+    return `❌ Upload failed (HTTP ${err.status}) — ${err.code || ''} ${err.message || ''}`.trim();
+}
+
+/* =========================================================
+   FIXED: R2-based Cloud APK Build
+   Flow:
+     1. buildId = crypto.randomUUID()
+     2. POST /api/r2-upload-url { buildId } → { uploadUrl, fileKey }
+     3. XHR PUT uploadUrl (signed headers only) with ZIP blob + progress
+     4. POST /api/r2-upload-complete { buildId, fileKey, appName, packageName, adMob }
+   ========================================================= */
+async function requestCloudAPKBuild() {
+    window.hideDropdownMenu();
+    openTerminalDrawer();
+
+    // === Duplicate guard ===
+    if (__r2BuildInProgress) {
+        logTerminalMessage('⏸️ Build already in progress. Please wait for it to complete.', true);
+        return;
+    }
+    __r2BuildInProgress = true;
+    r2HideProgress();
+
+    try {
+        const nameInput = document.getElementById('configAppNameInput');
+        const pkgInput = document.getElementById('configAppPackageInput');
+        const appName = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : (appMetadata.name || "MyApp");
+        const packageName = (pkgInput && pkgInput.value.trim()) ? pkgInput.value.trim() : (appMetadata.packageName || "com.studio.webapp");
+        const appIcon = appMetadata.iconDataUrl || null;
+
+        if (!appName) { logTerminalMessage("❌ App name is required.", true); return; }
+        if (!packageName) { logTerminalMessage("❌ Package name is required.", true); return; }
+        if (!virtualFileSystem || Object.keys(virtualFileSystem).length === 0) { logTerminalMessage("❌ No project files found to build APK.", true); return; }
+
+        logTerminalMessage("☁️ Starting R2-based Cloud APK Build...");
+
+        // === STEP 0: Offline bundling ===
+        try {
+            logTerminalMessage("🔍 Scanning for external dependencies (CDN links, fonts, scripts)...");
+            const bundleResult = await bundleAllExternalResourcesForOffline(virtualFileSystem);
+            if (bundleResult.filesBundled > 0) {
+                logTerminalMessage(`✅ Offline bundle ready (${bundleResult.filesBundled} resources embedded).`);
+            } else if (bundleResult.alreadyBundled > 0) {
+                logTerminalMessage(`✅ Offline bundle reused (${bundleResult.alreadyBundled} resources cached).`);
+            } else {
+                logTerminalMessage(`ℹ️ No external resources to bundle.`);
+            }
+            saveToLocalStorage();
+            renderFileTree();
+        } catch (bundleErr) {
+            logTerminalMessage(`⚠️ Offline bundler error (continuing): ${bundleErr.message}`, true);
+        }
+
+        // === STEP 1: Generate buildId ===
+        let buildId;
+        try {
+            buildId = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+                ? crypto.randomUUID()
+                : ('build-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10));
+        } catch (e) {
+            buildId = 'build-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+        }
+        logTerminalMessage(`🆔 Build ID: ${buildId}`);
+
+        let uploadUrl, fileKey;
+
+        // === STEP 3: Build ZIP and upload directly to R2 (XHR, signed headers only) ===
+        let zipBlob;
+        try {
+            logTerminalMessage("📦 Packaging project into ZIP...");
+            zipBlob = await buildProjectZipBlob();
+            logTerminalMessage(`✅ ZIP created (${(zipBlob.size / 1024 / 1024).toFixed(2)} MB).`);
+        } catch (zipErr) {
+            logTerminalMessage(`❌ ZIP generation failed: ${zipErr.message}`, true);
+            return;
+        }
+
+        // === STEP 2: Request a fresh presigned URL AFTER ZIP is ready ===
+        // This prevents offline bundling / ZIP creation time from consuming URL expiry.
+        try {
+            const cleanBaseUrl = BACKEND_URL.replace(/\/+$/, '');
+            const urlResp = await fetch(`${cleanBaseUrl}/api/r2-upload-url`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'omit',
+                body: JSON.stringify({ buildId })
+            });
+            if (!urlResp.ok) {
+                const errText = await urlResp.text().catch(() => '');
+                throw new Error(`Upload URL request failed (HTTP ${urlResp.status})${errText ? ': ' + errText.slice(0, 200) : ''}`);
+            }
+            const urlData = await urlResp.json();
+            if (!urlData || !urlData.success || !urlData.uploadUrl || !urlData.fileKey) {
+                throw new Error(`Invalid upload URL response: ${JSON.stringify(urlData).slice(0, 200)}`);
+            }
+            uploadUrl = urlData.uploadUrl;
+            fileKey = urlData.fileKey;
+            logTerminalMessage(`✅ Fresh presigned upload URL received. File key: ${fileKey}`);
+        } catch (err) {
+            logTerminalMessage(`❌ Failed to get R2 upload URL: ${err.message}`, true);
+            return;
+        }
+
+        // Show progress bar
+        r2ShowProgress();
+        const signedHeaders = getSignedHeadersFromUrl(uploadUrl);
+        logTerminalMessage(`🔏 Signed headers in presigned URL: [${signedHeaders.join(', ') || 'none'}]`);
+
+        try {
+            logTerminalMessage("⬆️ Uploading ZIP to Cloudflare R2...");
+            await _uploadZipToR2(uploadUrl, zipBlob, (loaded, total, pct) => {
+                r2UpdateProgress(pct, loaded, total);
+            });
+            r2UpdateProgress(100, zipBlob.size, zipBlob.size);
+            logTerminalMessage(`✅ ZIP uploaded to R2 successfully (${(zipBlob.size / 1024 / 1024).toFixed(2)} MB).`);
+            r2HideProgress();
+        } catch (upErr) {
+            r2HideProgress();
+            const friendly = _classifyR2Error(upErr);
+            logTerminalMessage(`❌ R2 upload failed: ${friendly}`, true);
+            // Log technical detail
+            logTerminalMessage(`   ↳ Detail: status=${upErr.status || 0}, code=${upErr.code || 'none'}, msg=${upErr.message || 'none'}`, true);
+            if (upErr.responseText) {
+                logTerminalMessage(`   ↳ Body: ${String(upErr.responseText).slice(0, 500)}`, true);
+            }
+            logTerminalMessage(`🔁 Retry: menu → "Generate APK (Cloud Build)" phir click karein.`, false);
+            return;
+        }
+
+        // === STEP 4: Notify backend that upload is complete (trigger build) ===
+        const adMobConfig = getEffectiveAdMobConfig();
+        if (adMobConfig.enabled) logTerminalMessage(`📢 AdMob enabled — TestMode: ${adMobConfig.testMode}`);
+        logTerminalMessage("🚀 Triggering APK build on GitHub Actions...");
+
+        try {
+            const cleanBaseUrl = BACKEND_URL.replace(/\/+$/, '');
+            const completeResp = await fetch(`${cleanBaseUrl}/api/r2-upload-complete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'omit',
+                body: JSON.stringify({
+                    buildId,
+                    fileKey,
+                    appName,
+                    packageName,
+                    adMob: adMobConfig,
+                    appIcon: appIcon
+                })
+            });
+            const completeData = await completeResp.json().catch(() => ({}));
+
+            if (!completeResp.ok) {
+                const errMsg = completeData.error || completeData.message || `HTTP ${completeResp.status}`;
+                throw new Error(errMsg);
+            }
+            if (!completeData.success) {
+                throw new Error(completeData.error || completeData.message || 'Backend rejected build completion.');
+            }
+
+            logTerminalMessage("✅ " + (completeData.message || "Build request submitted."));
+            logTerminalMessage("🚀 GitHub Actions workflow started!");
+            if (completeData.downloadUrl) logTerminalMessage(`📥 Download: ${completeData.downloadUrl}`);
+            else if (completeData.artifactsUrl) logTerminalMessage(`📥 Artifacts: ${completeData.artifactsUrl}`);
+            else if (completeData.actionsUrl) logTerminalMessage(`📥 Actions: ${completeData.actionsUrl}`);
+            else logTerminalMessage("📥 Check GitHub Actions tab once build completes.");
+        } catch (err) {
+            logTerminalMessage(`❌ Build trigger failed: ${err.message || 'Unknown error'}`, true);
+        }
+    } finally {
+        __r2BuildInProgress = false;
+    }
+}
+
+function createNewFile() {
+const fileName = prompt("Enter file name (e.g. index.html, style.css, app.js):", "index.html");
+if (fileName) {
+virtualFileSystem[fileName] = "<!-- Web File -->\n";
+saveToLocalStorage();
+renderFileTree();
+openFileFromPath(fileName);
+}
+}
+
+/* =========================================================
+   AI PROVIDER REGISTRY (BYOK — API providers)
+   ========================================================= */
+const AI_PROVIDERS = {
+    openai: {
+        label: 'OpenAI',
+        keyLabel: 'OpenAI API Key',
+        keyHint: 'Get from platform.openai.com/api-keys',
+        keyPrefix: 'sk-',
+        modelsEndpoint: 'https://api.openai.com/v1/models',
+        chatEndpoint: 'https://api.openai.com/v1/chat/completions',
+        authHeader: (key) => ({ 'Authorization': `Bearer ${key}` }),
+        parseModels: (data) => {
+            if (!data || !Array.isArray(data.data)) return [];
+            return data.data.map(m => m.id).filter(id => id && (id.startsWith('gpt-') || id.startsWith('o1') || id.startsWith('o3') || id.startsWith('chatgpt-'))).sort();
+        },
+        defaultModel: 'gpt-4o-mini',
+        buildChatBody: (model, messages) => ({ model, messages: messages.map(m => ({ role: m.role, content: m.content })), temperature: 0.7 }),
+        parseChatResponse: (data) => (data && data.choices && data.choices[0] && data.choices[0].message) ? (data.choices[0].message.content || '') : ''
+    },
+    groq: {
+        label: 'Groq',
+        keyLabel: 'Groq API Key',
+        keyHint: 'Get from console.groq.com/keys',
+        keyPrefix: 'gsk_',
+        modelsEndpoint: 'https://api.groq.com/openai/v1/models',
+        chatEndpoint: 'https://api.groq.com/openai/v1/chat/completions',
+        authHeader: (key) => ({ 'Authorization': `Bearer ${key}` }),
+        parseModels: (data) => {
+            if (!data || !Array.isArray(data.data)) return [];
+            return data.data.map(m => m.id).filter(Boolean).sort();
+        },
+        defaultModel: 'llama-3.3-70b-versatile',
+        buildChatBody: (model, messages) => ({ model, messages: messages.map(m => ({ role: m.role, content: m.content })), temperature: 0.7 }),
+        parseChatResponse: (data) => (data && data.choices && data.choices[0] && data.choices[0].message) ? (data.choices[0].message.content || '') : ''
+    },
+    gemini: {
+        label: 'Google Gemini',
+        keyLabel: 'Gemini API Key',
+        keyHint: 'Get from aistudio.google.com/apikey',
+        keyPrefix: 'AIza',
+        modelsEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
+        chatEndpointBuilder: (model) => `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+        authHeader: (key) => ({ 'x-goog-api-key': key }),
+        modelsListUrl: (key) => `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`,
+        parseModels: (data) => {
+            if (!data || !Array.isArray(data.models)) return [];
+            return data.models.filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent')).map(m => (m.name || '').replace(/^models\//, '')).filter(Boolean).sort();
+        },
+        defaultModel: 'gemini-2.0-flash',
+        buildChatBody: (model, messages) => {
+            const contents = messages.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+            return { contents, generationConfig: { temperature: 0.7 } };
+        },
+        parseChatResponse: (data) => (data && data.candidates && data.candidates[0] && data.candidates[0].content && Array.isArray(data.candidates[0].content.parts)) ? data.candidates[0].content.parts.map(p => p.text || '').join('') : ''
+    }
+};
+
+const AI_PROVIDER_LABELS = { openai: 'OpenAI', groq: 'Groq', gemini: 'Google Gemini', deepseek: 'DeepSeek' };
+const BYOK_STORAGE_KEY = 'was_byok_config_v1';
+const BYOK_ACTIVE_PROVIDER_KEY = 'was_byok_active_provider';
+
+let byokConfig = {
+    openai: { apiKey: '', model: '', customModel: '', modelsCache: [], lastRefreshed: 0 },
+    groq: { apiKey: '', model: '', customModel: '', modelsCache: [], lastRefreshed: 0 },
+    gemini: { apiKey: '', model: '', customModel: '', modelsCache: [], lastRefreshed: 0 },
+    deepseek: { apiKey: '', model: '', customModel: '', modelsCache: [], lastRefreshed: 0 }
+};
+
+let selectedAIProvider = 'groq';
+let activeSettingsProvider = 'openai';
+let aiChatHistory = [];
+let aiIsProcessing = false;
+if (!window.__aiCodeStore) window.__aiCodeStore = {};
+let __aiCodeBlockCounter = 0;
+
+function loadBYOKConfig() {
+    try {
+        const raw = localStorage.getItem(BYOK_STORAGE_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+                for (const p of Object.keys(byokConfig)) {
+                    if (parsed[p]) {
+                        byokConfig[p] = {
+                            apiKey: parsed[p].apiKey || '', model: parsed[p].model || '',
+                            customModel: parsed[p].customModel || '',
+                            modelsCache: Array.isArray(parsed[p].modelsCache) ? parsed[p].modelsCache : [],
+                            lastRefreshed: parsed[p].lastRefreshed || 0
+                        };
+                    }
+                }
+            }
+        }
+        const savedActive = localStorage.getItem(BYOK_ACTIVE_PROVIDER_KEY);
+        if (savedActive && AI_PROVIDERS[savedActive]) selectedAIProvider = savedActive;
+        else selectedAIProvider = 'groq';
+    } catch (e) { console.warn('[BYOK] Failed to load config:', e.message); }
+}
+function saveBYOKConfig() {
+    try {
+        localStorage.setItem(BYOK_STORAGE_KEY, JSON.stringify(byokConfig));
+        if (AI_PROVIDERS[selectedAIProvider]) localStorage.setItem(BYOK_ACTIVE_PROVIDER_KEY, selectedAIProvider);
+    } catch (e) { console.warn('[BYOK] Failed to save config:', e.message); }
+}
+function getProviderConfig(provider) {
+    if (!byokConfig[provider]) byokConfig[provider] = { apiKey: '', model: '', customModel: '', modelsCache: [], lastRefreshed: 0 };
+    return byokConfig[provider];
+}
+function getEffectiveModelForProvider(provider) {
+    const cfg = getProviderConfig(provider);
+    if (cfg.customModel && cfg.customModel.trim()) return cfg.customModel.trim();
+    if (cfg.model && cfg.model.trim()) return cfg.model.trim();
+    return '';
+}
+
+function updateProviderButtons() {
+    const btns = document.querySelectorAll('.provider-btn');
+    btns.forEach(btn => {
+        const p = btn.dataset.provider;
+        const active = p === selectedAIProvider;
+        btn.classList.toggle('bg-purple-600', active);
+        btn.classList.toggle('text-white', active);
+        btn.classList.toggle('border-purple-500', active);
+        btn.classList.toggle('bg-zinc-800', !active);
+        btn.classList.toggle('text-zinc-400', !active);
+        btn.classList.toggle('border-zinc-700', !active);
+        btn.classList.toggle('hover:bg-zinc-700', !active);
+    });
+    if (selectedAIProvider === 'deepseek' || !AI_PROVIDERS[selectedAIProvider]) {
+        updateAIStatus(`<span class="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 mr-1"></span><span>DeepSeek — website shortcut</span>`);
+        return;
+    }
+    const cfg = getProviderConfig(selectedAIProvider);
+    const hasKey = !!(cfg.apiKey && cfg.apiKey.trim());
+    const model = getEffectiveModelForProvider(selectedAIProvider);
+    if (hasKey && model) updateAIStatus(`<span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1"></span><span>${AI_PROVIDER_LABELS[selectedAIProvider]} • ${model}</span>`);
+    else if (hasKey) updateAIStatus(`<span class="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 mr-1"></span><span>${AI_PROVIDER_LABELS[selectedAIProvider]} • select model</span>`);
+    else updateAIStatus(`<span class="inline-block w-1.5 h-1.5 rounded-full bg-red-500 mr-1"></span><span>${AI_PROVIDER_LABELS[selectedAIProvider]} • add API key</span>`);
+}
+
+window.selectAIProvider = function(provider) {
+    if (provider === 'deepseek') {
+        const dsWin = window.open("https://chat.deepseek.com/", "_blank");
+        if (!dsWin) console.warn('[DeepSeek] Popup blocked by browser. Please allow popups for this site.');
+        return;
+    }
+    if (!AI_PROVIDERS[provider]) return;
+    if (aiIsProcessing) return;
+    selectedAIProvider = provider;
+    saveBYOKConfig();
+    updateProviderButtons();
+    logTerminalMessage(`🔄 AI provider → ${AI_PROVIDER_LABELS[provider]}`);
+};
+
+window.openAISettingsModal = function() {
+    const modal = document.getElementById('aiSettingsModal');
+    if (!modal) return;
+    activeSettingsProvider = AI_PROVIDERS[selectedAIProvider] ? selectedAIProvider : 'openai';
+    switchAISettingsTab(activeSettingsProvider);
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+};
+window.closeAISettingsModal = function() {
+    const modal = document.getElementById('aiSettingsModal');
+    if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+};
+function updateSettingsTabsUI() {
+    document.querySelectorAll('.ai-settings-tab').forEach(tab => {
+        const p = tab.dataset.provider;
+        const active = p === activeSettingsProvider;
+        tab.classList.toggle('border-purple-500', active);
+        tab.classList.toggle('text-purple-300', active);
+        tab.classList.toggle('text-zinc-400', !active);
+        tab.classList.toggle('border-transparent', !active);
+    });
+}
+window.switchAISettingsTab = function(provider) {
+    if (!AI_PROVIDERS[provider]) return;
+    activeSettingsProvider = provider;
+    updateSettingsTabsUI();
+    const prov = AI_PROVIDERS[provider];
+    const cfg = getProviderConfig(provider);
+    const keyLabelEl = document.getElementById('aiSettingsKeyLabel');
+    if (keyLabelEl) keyLabelEl.innerText = prov.keyLabel || 'API Key';
+    const keyHintEl = document.getElementById('aiSettingsKeyHint');
+    if (keyHintEl) keyHintEl.innerText = prov.keyHint || '';
+    const keyInput = document.getElementById('aiSettingsKeyInput');
+    if (keyInput) { keyInput.value = cfg.apiKey || ''; keyInput.type = 'password'; }
+    const eyeIcon = document.getElementById('aiSettingsEyeIcon');
+    if (eyeIcon) eyeIcon.className = 'fa-solid fa-eye text-[11px]';
+    const modelSelect = document.getElementById('aiSettingsModelSelect');
+    if (modelSelect) populateModelDropdown(provider, modelSelect, cfg.model);
+    const customInput = document.getElementById('aiSettingsCustomModelInput');
+    if (customInput) customInput.value = cfg.customModel || '';
+    const statusEl = document.getElementById('aiSettingsModelsStatus');
+    if (statusEl) {
+        if (cfg.modelsCache && cfg.modelsCache.length > 0) {
+            statusEl.innerHTML = `<span class="text-emerald-400"><i class="fa-solid fa-check-circle mr-1"></i>${cfg.modelsCache.length} models cached</span>${cfg.lastRefreshed ? ' • ' + new Date(cfg.lastRefreshed).toLocaleString() : ''}`;
+        } else statusEl.textContent = 'Click Refresh to load models.';
+    }
+    const testResult = document.getElementById('aiSettingsTestResult');
+    if (testResult) { testResult.classList.add('hidden'); testResult.textContent = ''; }
+};
+function populateModelDropdown(provider, selectEl, selectedValue) {
+    const cfg = getProviderConfig(provider);
+    const models = cfg.modelsCache || [];
+    selectEl.innerHTML = '';
+    if (models.length === 0) {
+        const opt = document.createElement('option'); opt.value = ''; opt.textContent = '— Load models to see options —'; selectEl.appendChild(opt);
+    } else {
+        const ph = document.createElement('option'); ph.value = ''; ph.textContent = '— Select a model —'; selectEl.appendChild(ph);
+        models.forEach(m => { const opt = document.createElement('option'); opt.value = m; opt.textContent = m; selectEl.appendChild(opt); });
+    }
+    if (selectedValue) selectEl.value = selectedValue;
+}
+window.toggleAIKeyVisibility = function() {
+    const input = document.getElementById('aiSettingsKeyInput');
+    const icon = document.getElementById('aiSettingsEyeIcon');
+    if (!input || !icon) return;
+    if (input.type === 'password') { input.type = 'text'; icon.className = 'fa-solid fa-eye-slash text-[11px]'; }
+    else { input.type = 'password'; icon.className = 'fa-solid fa-eye text-[11px]'; }
+};
+window.onAISettingsModelChange = function() {
+    const sel = document.getElementById('aiSettingsModelSelect');
+    const custom = document.getElementById('aiSettingsCustomModelInput');
+    if (sel && sel.value && custom) custom.value = '';
+};
+function setModelsStatus(html, isError = false) {
+    const el = document.getElementById('aiSettingsModelsStatus');
+    if (!el) return;
+    el.innerHTML = html;
+    el.classList.toggle('text-red-400', !!isError);
+    el.classList.toggle('text-zinc-500', !isError);
+}
+function setTestResult(html, kind) {
+    const el = document.getElementById('aiSettingsTestResult');
+    if (!el) return;
+    el.classList.remove('hidden');
+    el.classList.remove('bg-emerald-900/30','border-emerald-700/50','text-emerald-200','bg-red-900/30','border-red-700/50','text-red-200','bg-amber-900/30','border-amber-700/50','text-amber-200');
+    if (kind === 'success') el.classList.add('bg-emerald-900/30','border','border-emerald-700/50','text-emerald-200');
+    else if (kind === 'error') el.classList.add('bg-red-900/30','border','border-red-700/50','text-red-200');
+    else el.classList.add('bg-amber-900/30','border','border-amber-700/50','text-amber-200');
+    el.innerHTML = html;
+}
+window.refreshAIModels = async function() {
+    const provider = activeSettingsProvider;
+    const prov = AI_PROVIDERS[provider];
+    if (!prov) return;
+    const cfg = getProviderConfig(provider);
+    const apiKey = (document.getElementById('aiSettingsKeyInput')?.value || '').trim();
+    if (!apiKey) { setModelsStatus('<span class="text-red-400"><i class="fa-solid fa-circle-exclamation mr-1"></i>Please enter your API key first.</span>', true); return; }
+    const btn = document.getElementById('aiSettingsRefreshBtn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-[10px]"></i> <span class="hidden sm:inline">Loading</span>'; }
+    setModelsStatus('<span class="text-zinc-400"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Fetching models from provider...</span>');
+    try {
+        let url = prov.modelsEndpoint;
+        const headers = { ...prov.authHeader(apiKey) };
+        if (provider === 'gemini' && prov.modelsListUrl) url = prov.modelsListUrl(apiKey);
+        const resp = await fetch(url, { method: 'GET', headers });
+        const text = await resp.text();
+        let data = null; try { data = JSON.parse(text); } catch (e) {}
+        if (!resp.ok) {
+            const detail = (data && (data.error?.message || data.error || data.message)) || text.slice(0, 200) || `HTTP ${resp.status}`;
+            setModelsStatus(`<span class="text-red-400"><i class="fa-solid fa-circle-xmark mr-1"></i>Provider error (HTTP ${resp.status}): ${escapeHtml(String(detail))}</span>`, true);
+            return;
+        }
+        const models = prov.parseModels(data) || [];
+        if (models.length === 0) { setModelsStatus('<span class="text-amber-400">Provider returned 0 models. You can type a Custom Model ID.</span>', true); return; }
+        cfg.modelsCache = models; cfg.lastRefreshed = Date.now(); saveBYOKConfig();
+        const selectEl = document.getElementById('aiSettingsModelSelect');
+        if (selectEl) {
+            populateModelDropdown(provider, selectEl, cfg.model);
+            if (cfg.model && !models.includes(cfg.model)) {
+                const opt = document.createElement('option'); opt.value = cfg.model; opt.textContent = `${cfg.model} (saved)`; selectEl.appendChild(opt); selectEl.value = cfg.model;
+            }
+        }
+        setModelsStatus(`<span class="text-emerald-400"><i class="fa-solid fa-check-circle mr-1"></i>${models.length} models loaded from ${escapeHtml(prov.label)}.</span>`);
+        logTerminalMessage(`✅ ${prov.label}: ${models.length} models loaded.`);
+    } catch (err) {
+        const msg = err && err.message ? err.message : 'Unknown error';
+        setModelsStatus(`<span class="text-red-400"><i class="fa-solid fa-circle-xmark mr-1"></i>Network/CORS error: ${escapeHtml(msg)}</span>`, true);
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate text-[10px]"></i> <span class="hidden sm:inline">Refresh</span>'; }
+    }
+};
+window.testAIKeyAndModel = async function() {
+    const provider = activeSettingsProvider;
+    const prov = AI_PROVIDERS[provider];
+    if (!prov) return;
+    const apiKey = (document.getElementById('aiSettingsKeyInput')?.value || '').trim();
+    const modelSelectVal = (document.getElementById('aiSettingsModelSelect')?.value || '').trim();
+    const customModelVal = (document.getElementById('aiSettingsCustomModelInput')?.value || '').trim();
+    const model = customModelVal || modelSelectVal;
+    if (!apiKey) { setTestResult('⚠️ Please enter your API key first.', 'warn'); return; }
+    if (!model) { setTestResult('⚠️ Please select a model or enter a Custom Model ID.', 'warn'); return; }
+    const btn = document.getElementById('aiSettingsTestBtn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Testing...'; }
+    setTestResult('<i class="fa-solid fa-spinner fa-spin mr-1"></i> Sending test request...', 'warn');
+    try {
+        const messages = [{ role: 'user', content: 'Reply with just the word OK.' }];
+        const body = prov.buildChatBody(model, messages);
+        const headers = { 'Content-Type': 'application/json', ...prov.authHeader(apiKey) };
+        let url = prov.chatEndpoint;
+        if (provider === 'gemini' && prov.chatEndpointBuilder) { url = prov.chatEndpointBuilder(model); headers['x-goog-api-key'] = apiKey; }
+        const resp = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+        const text = await resp.text();
+        let data = null; try { data = JSON.parse(text); } catch (e) {}
+        if (!resp.ok) {
+            const errMsg = (data && (data.error?.message || data.error || data.message)) || text.slice(0, 300) || `HTTP ${resp.status}`;
+            setTestResult(`<b>❌ Test failed (HTTP ${resp.status})</b><br><span class="font-mono text-[10px] break-all">${escapeHtml(String(errMsg))}</span>`, 'error');
+            return;
+        }
+        const reply = prov.parseChatResponse(data);
+        if (!reply) { setTestResult('⚠️ Provider responded but returned empty content.', 'warn'); return; }
+        setTestResult(`<b>✅ Success!</b> ${escapeHtml(prov.label)} responded using model <code class="bg-black/40 px-1 rounded">${escapeHtml(model)}</code>.<br><span class="text-[10px] text-emerald-300/80">Response: "${escapeHtml(reply.slice(0, 100))}${reply.length > 100 ? '...' : ''}"</span>`, 'success');
+    } catch (err) {
+        const msg = err && err.message ? err.message : 'Unknown error';
+        setTestResult(`<b>❌ Network/CORS error</b><br><span class="font-mono text-[10px] break-all">${escapeHtml(msg)}</span>`, 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-flask-vial"></i> Test API Key & Model'; }
+    }
+};
+window.saveAISettingsForCurrentProvider = function() {
+    const provider = activeSettingsProvider;
+    const prov = AI_PROVIDERS[provider];
+    if (!prov) return;
+    const apiKey = (document.getElementById('aiSettingsKeyInput')?.value || '').trim();
+    const modelSelectVal = (document.getElementById('aiSettingsModelSelect')?.value || '').trim();
+    const customModelVal = (document.getElementById('aiSettingsCustomModelInput')?.value || '').trim();
+    if (!apiKey) { setTestResult('⚠️ Please enter your API key before saving.', 'warn'); return; }
+    if (!modelSelectVal && !customModelVal) { setTestResult('⚠️ Please select a model or enter a Custom Model ID.', 'warn'); return; }
+    const cfg = getProviderConfig(provider);
+    cfg.apiKey = apiKey; cfg.model = modelSelectVal; cfg.customModel = customModelVal;
+    saveBYOKConfig();
+    selectedAIProvider = provider; saveBYOKConfig(); updateProviderButtons();
+    setTestResult(`<b>✅ Saved!</b> ${escapeHtml(prov.label)} settings saved.`, 'success');
+    logTerminalMessage(`💾 ${prov.label} settings saved.`);
+};
+
+async function sendAIMessage() {
+    if (aiIsProcessing) return;
+    const input = document.getElementById('aiChatInput');
+    const sendBtn = document.getElementById('aiSendBtn');
+    if (!input) return;
+    const userText = input.value.trim();
+    if (!userText) return;
+    if (!AI_PROVIDERS[selectedAIProvider]) {
+        appendAIChatMessage('assistant', 'ℹ️ Select OpenAI, Groq, or Gemini for API chat.', true);
+        return;
+    }
+    const provider = selectedAIProvider;
+    const prov = AI_PROVIDERS[provider];
+    const cfg = getProviderConfig(provider);
+    const apiKey = (cfg.apiKey || '').trim();
+    const model = getEffectiveModelForProvider(provider);
+    if (!apiKey) { appendAIChatMessage('assistant', '⚠️ Please add your own API key in AI Settings.', true); return; }
+    if (!model) { appendAIChatMessage('assistant', '⚠️ Please select a model in AI Settings.', true); return; }
+    aiIsProcessing = true;
+    input.value = '';
+    autoResizeAIInput(input);
+    if (sendBtn) sendBtn.disabled = true;
+    appendAIChatMessage('user', userText);
+    aiChatHistory.push({ role: 'user', content: userText });
+    const editorContent = document.getElementById('codeEditor')?.value || '';
+    const fileName = activeFile;
+    const providerMessages = [{ role: 'user', content: `Current file (${fileName}):\n\`\`\`\n${editorContent.slice(0, 12000)}\n\`\`\`\n\nUser request: ${userText}` }];
+    const recentHistory = aiChatHistory.slice(-12, -1);
+    const combined = [...recentHistory, ...providerMessages];
+    setAILoading(true);
+    updateAIStatus(`<span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1"></span><span>${escapeHtml(prov.label)} • ${escapeHtml(model)}</span>`);
+    try {
+        const headers = { 'Content-Type': 'application/json', ...prov.authHeader(apiKey) };
+        let url = prov.chatEndpoint;
+        if (provider === 'gemini' && prov.chatEndpointBuilder) { url = prov.chatEndpointBuilder(model); headers['x-goog-api-key'] = apiKey; }
+        const body = prov.buildChatBody(model, combined);
+        const resp = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+        const text = await resp.text();
+        let data = null; try { data = JSON.parse(text); } catch (e) {}
+        if (!resp.ok) {
+            const errMsg = (data && (data.error?.message || data.error || data.message)) || text.slice(0, 300) || `HTTP ${resp.status}`;
+            throw new Error(`Provider error (HTTP ${resp.status}): ${errMsg}`);
+        }
+        const reply = prov.parseChatResponse(data);
+        if (!reply || !String(reply).trim()) throw new Error('Provider returned an empty response.');
+        aiChatHistory.push({ role: 'assistant', content: reply });
+        appendAIChatMessage('assistant', reply);
+        updateAIStatus(`<span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1"></span><span>${escapeHtml(prov.label)} • ${escapeHtml(model)}</span>`);
+    } catch (err) {
+        const msg = (err && err.message) ? err.message : 'Network error.';
+        appendAIChatMessage('assistant', `⚠️ ${msg}`, true);
+        updateAIStatus(`<span class="inline-block w-1.5 h-1.5 rounded-full bg-red-500 mr-1"></span><span>Request failed</span>`);
+    } finally {
+        setAILoading(false); aiIsProcessing = false;
+        if (sendBtn) sendBtn.disabled = false;
+        if (input) { try { input.focus(); } catch(e) {} }
+    }
+}
+function escapeHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function formatAIMessage(text) {
+    if (!text) return '';
+    let html = escapeHtml(text);
+    const blocks = [];
+    html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, (m, lang, code) => {
+        const id = 'ai-code-' + (++__aiCodeBlockCounter);
+        const decoded = code.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+        window.__aiCodeStore[id] = decoded;
+        const blockHtml = `<div class="ai-code-block"><button class="copy-code-btn" onclick="copyAIBlock('${id}', this)">Copy</button><pre class="code-font text-[10px] text-zinc-300 whitespace-pre overflow-x-auto" style="padding-top:14px;margin:0;">${code}</pre></div>`;
+        const ph = `\u0000AIBLOCK${blocks.length}\u0000`; blocks.push(blockHtml); return ph;
+    });
+    html = html.replace(/`([^`\n]+)`/g, '<code class="bg-zinc-800 text-emerald-300 px-1 py-0.5 rounded text-[10px] code-font">$1</code>');
+    html = html.replace(/\*\*([^*\n]+)\*\*/g, '<b class="text-zinc-100">$1</b>');
+    html = html.replace(/\n/g, '<br>');
+    blocks.forEach((b, i) => html = html.replace(`\u0000AIBLOCK${i}\u0000`, b));
+    return html;
+}
+window.copyAIBlock = function(blockId, btn) {
+    const code = window.__aiCodeStore[blockId];
+    if (!code) return;
+    const finish = (ok) => {
+        if (!btn) return;
+        const original = btn.dataset.originalLabel || btn.innerText || 'Copy';
+        btn.dataset.originalLabel = original;
+        btn.classList.toggle('copied', ok); btn.innerText = ok ? 'Copied!' : 'Failed';
+        setTimeout(() => { btn.classList.remove('copied'); btn.innerText = original; }, 1500);
+    };
+    const fallback = () => {
+        try {
+            const ta = document.createElement('textarea'); ta.value = code; ta.style.cssText = 'position:fixed;left:-9999px;top:0;';
+            document.body.appendChild(ta); ta.select();
+            const ok = document.execCommand('copy'); document.body.removeChild(ta); finish(ok);
+        } catch(e) { finish(false); }
+    };
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(code).then(() => finish(true)).catch(fallback);
+    else fallback();
+};
+function appendAIChatMessage(role, content, isError = false) {
+    const container = document.getElementById('aiChatMessages');
+    if (!container) return null;
+    const div = document.createElement('div');
+    div.className = 'ai-chat-msg flex gap-2';
+    if (role === 'user') {
+        div.classList.add('justify-end');
+        div.innerHTML = `<div class="max-w-[85%] min-w-0"><div class="bg-emerald-600/20 border border-emerald-500/30 rounded-xl rounded-tr-sm p-2.5 text-zinc-200 leading-relaxed select-text">${escapeHtml(content)}</div></div>`;
+    } else {
+        const iconCls = isError ? 'fa-triangle-exclamation text-red-300' : 'fa-robot text-purple-300';
+        const iconBg = isError ? 'bg-red-600/30 border-red-500/40' : 'bg-purple-600/30 border-purple-500/40';
+        const labelCls = isError ? 'text-red-300' : 'text-purple-300';
+        const label = isError ? 'Error' : 'AI Assistant';
+        const bubbleCls = isError ? 'bg-red-600/15 border border-red-500/40 text-red-200' : 'bg-[#1f1f23] text-zinc-300';
+        const body = isError ? escapeHtml(content) : formatAIMessage(content);
+        div.innerHTML = `<div class="w-6 h-6 rounded-md ${iconBg} border flex items-center justify-center shrink-0"><i class="fa-solid ${iconCls} text-[10px]"></i></div><div class="flex-1 min-w-0"><div class="text-[10px] font-semibold ${labelCls} mb-1">${label}</div><div class="${bubbleCls} rounded-xl rounded-tl-sm p-2.5 leading-relaxed select-text">${body}</div></div>`;
+    }
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+    return div;
+}
+function updateAIStatus(html) {
+    const el = document.getElementById('aiProviderStatus');
+    if (el) el.innerHTML = html || '<span class="inline-block w-1.5 h-1.5 rounded-full bg-zinc-500"></span><span>Ready</span>';
+}
+function setAILoading(loading) {
+    const container = document.getElementById('aiChatMessages');
+    if (!container) return;
+    let el = document.getElementById('aiThinkingIndicator');
+    if (loading) {
+        if (!el) {
+            el = document.createElement('div'); el.id = 'aiThinkingIndicator'; el.className = 'ai-chat-msg flex gap-2';
+            el.innerHTML = `<div class="w-6 h-6 rounded-md bg-purple-600/30 border border-purple-500/40 flex items-center justify-center shrink-0"><i class="fa-solid fa-robot text-purple-300 text-[10px]"></i></div><div class="flex-1 min-w-0"><div class="text-[10px] font-semibold text-purple-300 mb-1">AI Assistant</div><div class="bg-[#1f1f23] rounded-xl rounded-tl-sm px-3 py-2.5 inline-flex items-center gap-2"><div class="tiktok-dots"><span class="tiktok-dot"></span><span class="tiktok-dot"></span></div><span class="text-[11px] text-zinc-400">AI is thinking...</span></div></div>`;
+        }
+        container.appendChild(el); container.scrollTop = container.scrollHeight;
+    } else if (el) el.remove();
+}
+function autoResizeAIInput(el) { if (!el) return; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight || 32, 128) + 'px'; }
+function handleAIInputKey(event) { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendAIMessage(); } }
+window.aiQuickAction = function(promptText) {
+    const input = document.getElementById('aiChatInput');
+    if (!input || aiIsProcessing) return;
+    input.value = promptText; autoResizeAIInput(input); input.focus(); sendAIMessage();
+};
+window.clearAIChat = function() {
+    aiChatHistory = [];
+    const container = document.getElementById('aiChatMessages');
+    if (container) {
+        container.innerHTML = `<div class="ai-chat-msg flex gap-2"><div class="w-6 h-6 rounded-md bg-purple-600/30 border border-purple-500/40 flex items-center justify-center shrink-0"><i class="fa-solid fa-robot text-purple-300 text-[10px]"></i></div><div class="flex-1 min-w-0"><div class="text-[10px] font-semibold text-purple-300 mb-1">AI Assistant</div><div class="bg-[#1f1f23] rounded-xl rounded-tl-sm p-2.5 text-zinc-300 leading-relaxed">👋 Chat cleared! Provider: <b class="text-purple-200">${escapeHtml(AI_PROVIDER_LABELS[selectedAIProvider] || 'None')}</b>.</div></div></div>`;
+    }
+    updateProviderButtons();
+};
+window.toggleAIChatDrawer = function() {
+    window.hideDropdownMenu();
+    const drawer = document.getElementById('aiChatDrawer');
+    if (drawer) {
+        const isOpen = !drawer.classList.contains('translate-x-full');
+        if (isOpen) drawer.classList.add('translate-x-full');
+        else {
+            drawer.classList.remove('translate-x-full');
+            updateProviderButtons();
+            setTimeout(() => { const input = document.getElementById('aiChatInput'); if (input) input.focus(); }, 250);
+        }
+    }
+};
+window.closeAIChatDrawer = function() {
+    const drawer = document.getElementById('aiChatDrawer');
+    if (drawer) drawer.classList.add('translate-x-full');
+};
+
+let currentHighlightedLine = null;
+let currentMatchIndex = -1;
+let currentMatches = [];
+
+window.openSearchModal = function() {
+window.hideDropdownMenu();
+const total = document.getElementById('codeEditor').value.split('\n').length;
+document.getElementById('searchTotalLines').innerText = total;
+const input = document.getElementById('searchCodeInput');
+input.value = '';
+document.getElementById('searchPreviewBox').classList.add('hidden');
+currentMatches = []; currentMatchIndex = -1;
+const modal = document.getElementById('searchCodeModal');
+if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); setTimeout(() => input.focus(), 150); }
+};
+window.closeSearchModal = function() {
+const modal = document.getElementById('searchCodeModal');
+if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+};
+window.updateSearchPreview = function() {
+const input = document.getElementById('searchCodeInput');
+const query = (input?.value || '').trim();
+const previewBox = document.getElementById('searchPreviewBox');
+const list = document.getElementById('searchMatchList');
+const countEl = document.getElementById('searchMatchCount');
+if (!query) { previewBox.classList.add('hidden'); return; }
+const editor = document.getElementById('codeEditor');
+if (!editor) return;
+const lines = editor.value.split('\n');
+const matches = [];
+const lowerQuery = query.toLowerCase();
+for (let i = 0; i < lines.length; i++) if (lines[i].toLowerCase().includes(lowerQuery)) matches.push({ line: i + 1, text: lines[i] });
+currentMatches = matches; currentMatchIndex = matches.length > 0 ? 0 : -1;
+countEl.innerText = matches.length;
+if (matches.length === 0) { list.innerHTML = '<div class="text-[10px] text-red-400 py-1">Koi match nahi mila</div>'; previewBox.classList.remove('hidden'); return; }
+list.innerHTML = matches.slice(0, 20).map((m, idx) => {
+const safeText = m.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const highlighted = safeText.replace(new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi'), '<mark class="bg-yellow-500/40 text-yellow-100 rounded px-0.5">$1</mark>');
+return `<div onclick="jumpToMatch(${idx})" class="flex items-start gap-2 px-2 py-1 rounded cursor-pointer hover:bg-zinc-800/60 transition-colors"><span class="text-[9px] text-blue-400 font-mono shrink-0 w-8 text-right">${m.line}</span><span class="text-[10px] code-font text-zinc-400 truncate flex-1">${highlighted}</span></div>`;
+}).join('');
+if (matches.length > 20) list.innerHTML += `<div class="text-[9px] text-zinc-600 px-2 py-1">... +${matches.length - 20} more</div>`;
+previewBox.classList.remove('hidden');
+};
+window.performSearch = function() {
+const input = document.getElementById('searchCodeInput');
+const query = (input?.value || '').trim();
+if (!query) { input?.focus(); return; }
+if (currentMatches.length === 0) updateSearchPreview();
+if (currentMatches.length === 0) { alert('Koi match nahi mila.'); return; }
+jumpToMatch(0);
+};
+window.jumpToMatch = function(idx) {
+if (idx < 0 || idx >= currentMatches.length) return;
+currentMatchIndex = idx;
+const match = currentMatches[idx];
+const editor = document.getElementById('codeEditor');
+if (!editor) return;
+const lines = editor.value.split('\n');
+let offset = 0;
+for (let i = 0; i < match.line - 1; i++) offset += lines[i].length + 1;
+const lineText = lines[match.line - 1];
+const query = document.getElementById('searchCodeInput').value.trim();
+const col = lineText.toLowerCase().indexOf(query.toLowerCase());
+const matchStart = offset + (col >= 0 ? col : 0);
+const matchEnd = matchStart + query.length;
+editor.focus(); editor.setSelectionRange(matchStart, matchEnd);
+const lineHeight = 21; const paddingTop = 16;
+const targetTop = paddingTop + (match.line - 1) * lineHeight;
+editor.scrollTop = Math.max(0, targetTop - 100);
+showLineHighlight(match.line);
+document.getElementById('searchMatchIndex').innerText = `${idx + 1}/${currentMatches.length}`;
+closeSearchModal();
+};
+function showLineHighlight(lineNum) {
+const overlay = document.getElementById('lineHighlightOverlay');
+const editor = document.getElementById('codeEditor');
+if (!overlay || !editor) return;
+currentHighlightedLine = lineNum;
+const lineHeight = 21; const paddingTop = 16;
+overlay.style.display = 'block';
+overlay.style.top = (paddingTop + (lineNum - 1) * lineHeight - editor.scrollTop) + 'px';
+clearTimeout(window.__lineHighlightTimer);
+window.__lineHighlightTimer = setTimeout(() => hideLineHighlight(), 4000);
+}
+function hideLineHighlight() {
+const overlay = document.getElementById('lineHighlightOverlay');
+if (overlay) overlay.style.display = 'none';
+currentHighlightedLine = null;
+}
+function repositionLineHighlight() { if (currentHighlightedLine !== null) showLineHighlight(currentHighlightedLine); }
+
+window.onload = function() {
+  loadFromLocalStorage();
+  syncAppConfigFromSystem();
+  renderFileTree();
+  const editor = document.getElementById('codeEditor');
+  if (editor) editor.value = getFileContent(activeFile);
+  const fileNameEl = document.getElementById('activeFileName');
+  if (fileNameEl) fileNameEl.innerText = activeFile;
+  updateLineNumbers();
+  const ctx = document.getElementById('aiContextFile');
+  if (ctx) ctx.innerText = activeFile;
+  loadBYOKConfig();
+  updateProviderButtons();
+  if (window.AndroidAds) {
+      try {
+          if (typeof window.AndroidAds.configure === 'function') {
+              window.AndroidAds.configure(JSON.stringify(getEffectiveAdMobConfig()));
+              logTerminalMessage('📢 Native AdMob bridge detected and configured.');
+          }
+          if (appMetadata.adMob && appMetadata.adMob.enabled && typeof window.AndroidAds.initialize === 'function') {
+              window.AndroidAds.initialize();
+              logTerminalMessage('📢 AdMob SDK initialization requested.');
+          }
+      } catch(e) {
+          logTerminalMessage('⚠️ AdMob bridge configuration failed: ' + e.message, true);
+      }
+  }
+};
+</script>
+</body>
+</html>
